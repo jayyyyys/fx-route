@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rates and assumptions · FX Route Planner</title>
+<link rel="stylesheet" href="fx-theme.css">
+<style>
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 14px; }
+  .provs { display: grid; gap: 14px; }
+  .prov { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; background: var(--card); box-shadow: var(--shadow); }
+  .prov.off { opacity: .6; }
+  .prov-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+  .prov-head .input { flex: 1 1 220px; font-weight: 700; font-size: 1.05rem; }
+  .prov-status { margin-top: 12px; padding: 8px 14px; border-radius: 14px; background: var(--brand-soft); color: var(--brand-ink); font-size: .92rem; }
+  .prov-status.bad { background: var(--bad-soft); color: var(--bad-ink); }
+  .prov-status.warn { background: var(--warn-soft); color: var(--warn-ink); }
+  .quote-only[hidden], .margin-only[hidden] { display: none; }
+  .ferr { color: var(--bad-ink); font-size: .8rem; margin: 3px 0 0 12px; min-height: 1em; }
+  .row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .saved { font-size: .9rem; }
+  .codes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  @media (max-width: 760px) { .codes { grid-template-columns: minmax(0, 1fr); } }
+  .codecard { border-radius: 18px; padding: 12px 14px; background: var(--brand-soft); }
+  .codecard b { color: var(--brand-ink); }
+  .codecard p { margin: 4px 0 0; font-size: .92rem; }
+  .pass { color: var(--accent-ink); font-weight: 700; }
+  .fail { color: var(--bad-ink); font-weight: 700; }
+  .method details { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .method summary { font-weight: 700; }
+  .method p, .method pre { margin: 8px 0 0; }
+  .method pre { background: var(--bg); border-radius: 14px; padding: 10px 14px; overflow-x: auto; font-size: .85rem; font-family: Consolas, "Courier New", monospace; }
+  .note { font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap" id="inapp">
+  <header class="top">
+    <div class="brand">
+      <h1>Rates and assumptions</h1>
+      <p>Provider quotes, fees, SWIFT charge codes and risk settings for the FX Route Planner</p>
+      <span class="bar" aria-hidden="true"></span>
+    </div>
+    <div class="controls">
+      <span class="pill saved" id="savedPill" aria-live="polite">All changes saved</span>
+      <a class="btn primary" href="fx-board.html">← Back to the board</a>
+    </div>
+  </header>
+
+  <div class="banner show info">Illustrative only. Changes save automatically in this browser and update an open board straight away. Defaults marked "illustrative" are placeholders; replace them with real quotes.</div>
+
+  <nav class="tabs" aria-label="Sections">
+    <a href="#providers">Provider rates</a><a href="#fees">Fees and SWIFT</a><a href="#risk">Risk and timing</a>
+    <a href="#fallback">Fallback rates</a><a href="#selfcheck">Self-check</a><a href="#method">Methodology</a><a href="#data">Save and reset</a>
+  </nav>
+
+  <p class="hint" id="midNote"></p>
+
+  <!-- Providers -->
+  <section id="providers" aria-labelledby="pTitle">
+    <h2 id="pTitle">Provider rates <small>Malaysian, Singapore and Thai banks, platforms and dealer quotes</small></h2>
+    <p class="note">Each provider is priced as <b>live mid minus a margin</b> (the methodology's markup model), unless you type a quote for a specific pair. A typed quote is checked against a sanity band of −25 to +500 bps from mid, which catches per-100 and inverted-pair mistakes.</p>
+    <div class="provs" id="provList"></div>
+    <div class="row-actions"><button type="button" class="btn" id="addProv">+ Add provider</button></div>
+  </section>
+
+  <!-- Fees -->
+  <section id="fees" aria-labelledby="fTitle">
+    <h2 id="fTitle">Transfer fees and SWIFT <small>Fees are in the sending currency</small></h2>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label for="f-sender">Sender TT fee</label><input class="input" id="f-sender" data-k="fees.sender" data-min="0" data-max="100000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="f-inter">Intermediary fee</label><input class="input" id="f-inter" data-k="fees.inter" data-min="0" data-max="100000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="f-landing">Receiving bank landing fee</label><input class="input" id="f-landing" data-k="fees.landing" data-min="0" data-max="100000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="f-tt">TT transit (business days)</label><input class="input" id="f-tt" data-k="fees.ttDays" data-min="0" data-max="30" data-int="1" inputmode="numeric"><div class="ferr"></div></div>
+        <div class="field"><label for="f-usd">USD correspondent fee (USD)</label><input class="input" id="f-usd" data-k="fees.usdCorrFeeUsd" data-min="0" data-max="10000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="f-usdd">Via-USD extra days</label><input class="input" id="f-usdd" data-k="fees.usdExtraDays" data-min="0" data-max="30" data-int="1" inputmode="numeric"><div class="ferr"></div></div>
+        <div class="field"><label for="f-pd">Platform payout (days)</label><input class="input" id="f-pd" data-k="fees.platformDays" data-min="0" data-max="30" data-int="1" inputmode="numeric"><div class="ferr"></div></div>
+      </div>
+      <p class="hint">Defaults follow the sheet example: SGD 20 sender fee, SGD 10 intermediary fee, 1 day transit. The USD correspondent fee and the extra days are illustrative.</p>
+      <h3 style="margin-top:18px">Default SWIFT charge code</h3>
+      <div class="seg" role="group" aria-label="SWIFT charge code" id="codeSeg">
+        <button type="button" data-code="OUR">OUR</button><button type="button" data-code="SHA">SHA</button><button type="button" data-code="BEN">BEN</button>
+      </div>
+      <div class="codes">
+        <div class="codecard"><b>OUR: you pay everything</b><p>Sender and intermediary fees are added on top. The beneficiary gets the full amount. Best for supplier invoices.</p></div>
+        <div class="codecard"><b>SHA: shared</b><p>You pay your bank's fee on top. Intermediary and landing fees come out of the amount on the way.</p></div>
+        <div class="codecard"><b>BEN: beneficiary pays</b><p>All fees come out of the amount. You pay nothing extra; they receive the least.</p></div>
+      </div>
+      <p class="hint" id="codeExample"></p>
+    </div>
+  </section>
+
+  <!-- Risk -->
+  <section id="risk" aria-labelledby="rTitle">
+    <h2 id="rTitle">Risk and timing</h2>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label for="r-vol">Annual volatility (%)</label><input class="input" id="r-vol" data-k="risk.annualVolPct" data-min="0" data-max="100" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="r-rfq">Ask for RFQ above (USD)</label><input class="input" id="r-rfq" data-k="risk.rfqThresholdUsd" data-min="0" data-max="1000000000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="r-cut">TT cut-off time (local)</label><input class="input" id="r-cut" type="time" data-k="risk.cutoff" data-text="1"><div class="ferr"></div></div>
+      </div>
+      <p class="hint">3% annual volatility is the methodology's fallback assumption (about 18.9 bps per day). The cut-off time is illustrative; cut-offs vary by bank and currency.</p>
+    </div>
+  </section>
+
+  <!-- Fallback -->
+  <section id="fallback" aria-labelledby="fbTitle">
+    <h2 id="fbTitle">Fallback rates <small>Used only when no source rate is available</small></h2>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label for="fb-myr">MYR per 1 USD</label><input class="input" id="fb-myr" data-k="fallback.USD/MYR" data-min="0.0001" data-max="100000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="fb-sgd">SGD per 1 USD</label><input class="input" id="fb-sgd" data-k="fallback.USD/SGD" data-min="0.0001" data-max="100000" inputmode="decimal"><div class="ferr"></div></div>
+        <div class="field"><label for="fb-thb">THB per 1 USD</label><input class="input" id="fb-thb" data-k="fallback.USD/THB" data-min="0.0001" data-max="100000" inputmode="decimal"><div class="ferr"></div></div>
+      </div>
+      <p class="hint">Illustrative values. 33.54 / 1.30 gives SGD/THB 25.80, the sheet's reference mid. Replace them with today's rates if you work offline.</p>
+    </div>
+  </section>
+
+  <!-- Self-check -->
+  <section id="selfcheck" aria-labelledby="scTitle">
+    <h2 id="scTitle">Self-check <small>Does the engine reproduce the methodology's worked examples?</small></h2>
+    <div class="panel">
+      <p id="scSummary"></p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Check</th><th class="num">Expected</th><th class="num">Engine</th><th>Result</th></tr></thead>
+        <tbody id="scBody"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- Methodology -->
+  <section id="method" aria-labelledby="mTitle">
+    <h2 id="mTitle">Methodology <small>How the board works it out</small></h2>
+    <div class="panel method">
+      <details open><summary>Rate types</summary><p>A mid (central-bank reference or aggregator) is the fair market rate. A board rate, platform rate or dealer quote is what a customer actually gets. Only mids feed the consensus; customer rates never do.</p></details>
+      <details><summary>Consensus mid</summary><pre>first = median(fresh mids)
+used  = sources within 50 bps of first
+mid   = median(used)
+spread = largest |rate − mid| of a used source, in bps</pre><p>Fresh means at most 2 business days old. If nothing is fresh, older rates are used and labelled stale; if there are none, the fallback rates are used.</p></details>
+      <details><summary>Provider margin (markup model)</summary><pre>margin_bps = (mid − customer_rate) / mid × 10,000
+customer_rate = live_mid × (1 − margin_bps / 10,000)</pre><p>Margins change less than rates, so storing a margin and re-applying it to the live mid keeps estimates current.</p></details>
+      <details><summary>Routes</summary><p>A route is a chain of legs: transfers (TT) and conversions. A: convert in the sending country, then send. B: send the source currency to your own account abroad, then convert there. C: convert a balance already held abroad. Via USD: two conversions with a US correspondent. Platform: local pay-in and payout. Dealer RFQ: negotiated rate at the sending bank.</p></details>
+      <details><summary>Fees and SWIFT codes</summary><pre>OUR: sender + intermediary on top; landing fee deducted
+SHA: sender on top; intermediary + landing deducted
+BEN: all deducted</pre><p>On-top fees raise what you pay; deducted fees shrink what gets converted or received.</p></details>
+      <details><summary>Comparing routes fairly</summary><pre>effective_rate = net_received / total_paid
+net_per_amount = effective_rate × amount
+cost_bps = (total_paid × mid − net_received) / (total_paid × mid) × 10,000
+edge = net_per_amount(route) − net_per_amount(other)</pre><p>Routes can cost slightly different totals, so they are scaled to the same amount before comparing.</p></details>
+      <details><summary>Transit risk</summary><pre>daily_vol = annual_vol / √252
+band = net_received × daily_vol × √(days unconverted)
+P(edge lost) = Φ(−edge / band)</pre><p>Assumes normal daily moves and constant volatility. Real FX has fat tails and event risk.</p></details>
+      <details><summary>What this tool does not do</summary><p>It compares and explains; it never moves money, does not guarantee a rate, and never suggests splitting a payment to stay under a threshold. Calculations use floating-point numbers rounded for display; the self-check above confirms they match the worked examples.</p></details>
+    </div>
+  </section>
+
+  <!-- Data -->
+  <section id="data" aria-labelledby="dTitle">
+    <h2 id="dTitle">Save, share and reset</h2>
+    <div class="panel">
+      <div class="row-actions" style="margin-top:0">
+        <button type="button" class="btn" id="exportBtn">Export settings (JSON)</button>
+        <label class="btn" for="importFile">Import settings…</label>
+        <input type="file" id="importFile" accept="application/json,.json" class="sr">
+        <button type="button" class="btn danger" id="resetBtn">Reset everything to defaults</button>
+      </div>
+      <p class="err" id="dataMsg" role="status"></p>
+      <p class="hint">Settings live in this browser only. Export them to share your assumptions with a colleague.</p>
+    </div>
+  </section>
+
+  <footer><p><strong>Illustrative only. Not financial, legal or tax advice.</strong> Verify every rate, fee and SWIFT/BIC code with the bank before use.</p></footer>
+</div>
+
+<script src="fx-core.js"></script>
+<script>
+(function () {
+  "use strict";
+  var FX = window.FX, root = document.getElementById("inapp");
+  var $ = function (id) { return root.querySelector("#" + id); };
+  var esc = FX.esc;
+  var S = FX.loadSettings();
+  var snap = FX.loadSnapshot();
+  var mid = FX.makeMid(snap ? snap.perUsd : {}, S, new Date());
+  var savedTimer = null;
+
+  var PAIRS = [];
+  FX.ROUTE_CCYS.forEach(function (a) { FX.ROUTE_CCYS.forEach(function (b) { if (a !== b) PAIRS.push(a + "/" + b); }); });
+  var COUNTRIES = ["SG", "TH", "MY", "US", "ANY", "ORIGIN"];
+
+  function save() {
+    var ok = FX.saveSettings(S);
+    var p = $("savedPill");
+    p.textContent = ok ? "Saved " + FX.hhmm(new Date()) : "Could not save (storage blocked)";
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(function () { p.textContent = ok ? "All changes saved" : p.textContent; }, 2500);
+  }
+  function refreshMid() { mid = FX.makeMid(snap ? snap.perUsd : {}, S, new Date()); }
+
+  function midNote() {
+    var i = mid.info("SGD", "THB");
+    $("midNote").textContent = i.how === "fallback"
+      ? "No saved market rates yet, so checks below use the fallback rates. Open the board once while online to save live rates."
+      : "Checks below use market rates saved by the board at " + FX.hhmm(snap.at) + " " + FX.dayMon(snap.at) + (i.how === "stale" ? " (older than 2 business days)." : ".");
+  }
+
+  /* ---------- Providers ---------- */
+  function opt(v, label, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(label) + "</option>"; }
+  function provCard(p, i) {
+    var pair = (p.quotePair || "SGD/THB").split("/");
+    return '<article class="prov' + (p.enabled ? "" : " off") + '" data-i="' + i + '">' +
+      '<div class="prov-head">' +
+        '<label class="switch"><input type="checkbox" data-f="enabled"' + (p.enabled ? " checked" : "") + ' aria-label="Include ' + esc(p.name) + '"></label>' +
+        '<input class="input" data-f="name" value="' + esc(p.name) + '" aria-label="Provider name" maxlength="60">' +
+        '<button type="button" class="btn small danger" data-del="' + i + '" aria-label="Remove ' + esc(p.name) + '">Remove</button>' +
+      "</div>" +
+      '<div class="grid2">' +
+        '<div class="field"><label>Where</label><select class="input" data-f="country">' + COUNTRIES.map(function (c) { return opt(c, FX.COUNTRY_NAME[c], p.country); }).join("") + "</select></div>" +
+        '<div class="field"><label>Type</label><select class="input" data-f="kind">' + Object.keys(FX.KIND_LABEL).map(function (k) { return opt(k, FX.KIND_LABEL[k], p.kind); }).join("") + "</select></div>" +
+        '<div class="field"><label>Rate input</label><div class="seg" role="group" aria-label="Rate input"><button type="button" data-mode="markup" aria-pressed="' + (p.mode !== "quote") + '">Margin</button><button type="button" data-mode="quote" aria-pressed="' + (p.mode === "quote") + '">Typed quote</button></div></div>' +
+        '<div class="field"><label>Margin vs mid (bps)</label><input class="input" data-f="markupBps" data-num="1" data-min="-100" data-max="2000" value="' + esc(p.markupBps) + '" inputmode="decimal"><div class="ferr"></div></div>' +
+        '<div class="field quote-only"' + (p.mode === "quote" ? "" : " hidden") + '><label>Quote for pair</label><select class="input" data-f="quotePair">' + PAIRS.map(function (x) { return opt(x, x, p.quotePair); }).join("") + "</select></div>" +
+        '<div class="field quote-only"' + (p.mode === "quote" ? "" : " hidden") + '><label>Quoted as</label><select class="input" data-f="quoteBasis">' + opt("direct", pair[1] + " per " + (p.quoteUnit || 1) + " " + pair[0], p.quoteBasis) + opt("inverse", pair[0] + " per " + (p.quoteUnit || 1) + " " + pair[1], p.quoteBasis) + "</select></div>" +
+        '<div class="field quote-only"' + (p.mode === "quote" ? "" : " hidden") + '><label>Unit</label><select class="input" data-f="quoteUnit">' + opt("1", "1", String(p.quoteUnit)) + opt("100", "100", String(p.quoteUnit)) + opt("1000", "1,000", String(p.quoteUnit)) + "</select></div>" +
+        '<div class="field quote-only"' + (p.mode === "quote" ? "" : " hidden") + '><label>Quoted value</label><input class="input" data-f="quoteValue" data-num="1" data-min="0" data-max="1000000" value="' + esc(p.quoteValue || "") + '" inputmode="decimal" placeholder="e.g. 25.65"><div class="ferr"></div></div>' +
+        '<div class="field"><label>Fee (% of amount)</label><input class="input" data-f="feePct" data-num="1" data-min="0" data-max="10" value="' + esc(p.feePct) + '" inputmode="decimal"><div class="ferr"></div></div>' +
+        '<div class="field"><label>Fixed fee (sending ccy)</label><input class="input" data-f="feeFixed" data-num="1" data-min="0" data-max="100000" value="' + esc(p.feeFixed) + '" inputmode="decimal"><div class="ferr"></div></div>' +
+        '<div class="field"><label>SWIFT / BIC</label><input class="input" data-f="bic" value="' + esc(p.bic) + '" maxlength="11" placeholder="8 or 11 characters" autocapitalize="characters"><div class="ferr"></div></div>' +
+      "</div>" +
+      '<div class="field" style="margin-top:10px"><label>Note / source</label><textarea class="input" data-f="note" rows="2" maxlength="300">' + esc(p.note) + "</textarea></div>" +
+      '<div class="prov-status" data-status></div>' +
+      "</article>";
+  }
+  function renderProviders() {
+    $("provList").innerHTML = S.providers.map(provCard).join("") || '<p class="hint">No providers. Add one, or reset to defaults.</p>';
+    S.providers.forEach(function (p, i) { updateStatus(i); });
+  }
+  function updateStatus(i) {
+    var card = root.querySelector('.prov[data-i="' + i + '"]'); if (!card) return;
+    var p = S.providers[i], el = card.querySelector("[data-status]");
+    var pair = p.mode === "quote" ? p.quotePair.split("/") : defaultPair(p);
+    var pr = FX.providerRate(p, pair[0], pair[1], mid);
+    var src = mid.info(pair[0], pair[1]).how;
+    if (p.mode === "quote" && !(+p.quoteValue > 0)) { el.className = "prov-status warn"; el.textContent = "Type a quoted value. Until then the margin of " + p.markupBps + " bps is used."; return; }
+    if (!pr.ok) { el.className = "prov-status bad"; el.textContent = pr.msg; return; }
+    el.className = "prov-status" + (Math.abs(pr.markupBps) > 300 ? " warn" : "");
+    el.textContent = "1 " + pair[0] + " = " + FX.fmtRate(pr.rate) + " " + pair[1] + " · " + pr.markupBps.toFixed(2) + " bps vs mid " + FX.fmtRate(mid(pair[0], pair[1])) + " (" + (src === "fallback" ? "fallback mid" : src === "stale" ? "stale mid" : "saved live mid") + ")" + (p.bic && !/^[A-Za-z]{6}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$/.test(p.bic) ? " · BIC format looks wrong (8 or 11 characters)" : "");
+  }
+  function defaultPair(p) {
+    var sc = S.scenario;
+    var c = p.country === "SG" ? "SGD" : p.country === "TH" ? "THB" : p.country === "MY" ? "MYR" : p.country === "US" ? "USD" : null;
+    if (c && c !== sc.from && c !== sc.to) return c === "USD" ? ["USD", "MYR"] : ["USD", c];
+    return [sc.from, sc.to === sc.from ? (sc.from === "USD" ? "MYR" : "USD") : sc.to];
+  }
+
+  function numCheck(el) {
+    var raw = String(el.value).replace(/[,\s]/g, ""), min = +el.getAttribute("data-min"), max = +el.getAttribute("data-max");
+    var errEl = el.parentNode.querySelector(".ferr"), msg = "";
+    var v = Number(raw);
+    if (raw === "" || !/^-?\d*\.?\d+$/.test(raw)) msg = "Enter a number.";
+    else if (v < min || v > max) msg = "Use a value from " + min + " to " + FX.fmtMoney(max, 0) + ".";
+    else if (el.hasAttribute("data-int") && v % 1) msg = "Use a whole number.";
+    el.setAttribute("aria-invalid", String(!!msg));
+    if (errEl) errEl.textContent = msg;
+    return msg ? null : v;
+  }
+
+  $("provList").addEventListener("input", function (e) {
+    var el = e.target, card = el.closest(".prov"); if (!card || !el.hasAttribute("data-f")) return;
+    var i = +card.getAttribute("data-i"), f = el.getAttribute("data-f"), p = S.providers[i];
+    if (el.type === "checkbox") { p[f] = el.checked; card.classList.toggle("off", !el.checked); }
+    else if (el.hasAttribute("data-num")) { var v = numCheck(el); if (v === null) return; p[f] = v; }
+    else if (f === "bic") { p.bic = el.value.toUpperCase().replace(/\s/g, ""); }
+    else if (f === "quoteUnit") { p.quoteUnit = +el.value; }
+    else p[f] = el.value;
+    save(); updateStatus(i);
+    if (f === "quotePair" || f === "quoteUnit") {
+      var pair = p.quotePair.split("/"), u = p.quoteUnit || 1, sel = card.querySelector('[data-f="quoteBasis"]');
+      sel.options[0].text = pair[1] + " per " + u + " " + pair[0]; sel.options[1].text = pair[0] + " per " + u + " " + pair[1];
+    }
+  });
+  $("provList").addEventListener("change", function (e) { if (e.target.tagName === "SELECT" || e.target.type === "checkbox") e.target.dispatchEvent(new Event("input", { bubbles: true })); });
+  $("provList").addEventListener("click", function (e) {
+    var del = e.target.closest("[data-del]");
+    if (del) {
+      var i = +del.getAttribute("data-del"), name = S.providers[i].name;
+      if (!confirm("Remove " + name + "? You can reset to defaults later.")) return;
+      S.providers.splice(i, 1); save(); renderProviders(); return;
+    }
+    var mb = e.target.closest("[data-mode]");
+    if (mb) {
+      var card = mb.closest(".prov"), j = +card.getAttribute("data-i");
+      S.providers[j].mode = mb.getAttribute("data-mode"); save(); renderProviders();
+      var again = root.querySelector('.prov[data-i="' + j + '"] [data-mode="' + S.providers[j].mode + '"]'); if (again) again.focus();
+    }
+  });
+  $("addProv").addEventListener("click", function () {
+    var p = FX.clone(FX.DEFAULTS.providers[0]);
+    p.id = "custom-" + Date.now(); p.name = "New provider"; p.country = FX.COUNTRY_OF[S.scenario.to] || "MY"; p.markupBps = 30; p.bic = ""; p.note = "Your source for this rate.";
+    S.providers.push(p); save(); renderProviders();
+    var cards = root.querySelectorAll(".prov"); var last = cards[cards.length - 1];
+    last.scrollIntoView({ block: "center" }); last.querySelector('[data-f="name"]').select();
+  });
+
+  /* ---------- Simple fields ---------- */
+  function getK(k) { var p = k.split("."); return S[p[0]][p.slice(1).join(".")]; }
+  function setK(k, v) { var p = k.split("."); S[p[0]][p.slice(1).join(".")] = v; }
+  function fillFields() {
+    root.querySelectorAll("[data-k]").forEach(function (el) { el.value = getK(el.getAttribute("data-k")); el.removeAttribute("aria-invalid"); var e = el.parentNode.querySelector(".ferr"); if (e) e.textContent = ""; });
+    root.querySelectorAll("#codeSeg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-code") === S.fees.code)); });
+    codeExample();
+  }
+  root.addEventListener("input", function (e) {
+    var el = e.target; if (!el.hasAttribute || !el.hasAttribute("data-k")) return;
+    var k = el.getAttribute("data-k");
+    if (el.hasAttribute("data-text")) { if (!/^\d{2}:\d{2}$/.test(el.value)) return; setK(k, el.value); }
+    else { var v = numCheck(el); if (v === null) return; setK(k, v); }
+    save();
+    if (k.indexOf("fallback") === 0) { refreshMid(); midNote(); S.providers.forEach(function (p, i) { updateStatus(i); }); }
+    codeExample();
+  });
+  $("codeSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-code]"); if (!b) return;
+    S.fees.code = b.getAttribute("data-code"); save(); fillFields();
+  });
+  function codeExample() {
+    var f = S.fees, sc = S.scenario;
+    $("codeExample").textContent = "With " + f.code + " and the fees above, sending " + sc.from + " " + FX.fmtMoney(+sc.amount, 0) + ": " +
+      (f.code === "OUR" ? "you pay " + FX.fmtMoney(+sc.amount + (+f.sender) + (+f.inter), 2) + "; " + FX.fmtMoney(+f.landing, 2) + " is deducted at the receiving bank."
+        : f.code === "SHA" ? "you pay " + FX.fmtMoney(+sc.amount + (+f.sender), 2) + "; " + FX.fmtMoney((+f.inter) + (+f.landing), 2) + " is deducted on the way."
+        : "you pay " + FX.fmtMoney(+sc.amount, 2) + "; " + FX.fmtMoney((+f.sender) + (+f.inter) + (+f.landing), 2) + " is deducted on the way.");
+  }
+
+  /* ---------- Self-check ---------- */
+  function renderSelfCheck() {
+    var r = FX.selfCheck(), pass = r.filter(function (x) { return x.pass; }).length;
+    $("scSummary").innerHTML = '<span class="tag ' + (pass === r.length ? "good" : "bad") + '">' + pass + " of " + r.length + " checks passed</span> Each figure comes from the worked examples in the methodology (sheet: SGD 1,000,000, mid 25.80, UOB SG 25.65, Thai Bank A 25.72, SHA fees 20 + 10, 1 day).";
+    $("scBody").innerHTML = r.map(function (x) {
+      var f = function (v) { return typeof v === "number" ? (Math.abs(v) >= 1000 ? FX.fmtMoney(v, 2) : (+v.toFixed(6)).toString()) : esc(v); };
+      return "<tr><td>" + esc(x.name) + '</td><td class="num">' + f(x.exp) + '</td><td class="num">' + f(x.got) + "</td><td>" + (x.pass ? '<span class="pass">✓ pass</span>' : '<span class="fail">× fail</span>') + "</td></tr>";
+    }).join("");
+  }
+
+  /* ---------- Data ---------- */
+  $("exportBtn").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "fx-settings.json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    $("dataMsg").textContent = "";
+  });
+  $("importFile").addEventListener("change", function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    var reader = new FileReader(), input = this;
+    reader.onload = function () {
+      try {
+        var obj = JSON.parse(reader.result);
+        if (!obj || obj.version !== 1 || !Array.isArray(obj.providers)) throw new Error("not an FX settings file");
+        S = FX.mergeDefaults(obj); save(); refreshMid(); fillFields(); renderProviders(); midNote();
+        $("dataMsg").textContent = "Imported " + f.name + ".";
+      } catch (e) { $("dataMsg").textContent = "Could not import: " + e.message + "."; }
+      input.value = "";
+    };
+    reader.readAsText(f);
+  });
+  $("resetBtn").addEventListener("click", function () {
+    if (!confirm("Reset all providers, fees and assumptions to the defaults? Consider exporting first.")) return;
+    S = FX.clone(FX.DEFAULTS); save(); refreshMid(); fillFields(); renderProviders(); midNote();
+    $("dataMsg").textContent = "Reset to defaults.";
+  });
+  window.addEventListener("storage", function (e) {
+    if (e.key === FX.SNAP_KEY) { snap = FX.loadSnapshot(); refreshMid(); midNote(); S.providers.forEach(function (p, i) { updateStatus(i); }); }
+  });
+
+  fillFields(); renderProviders(); renderSelfCheck(); midNote();
+})();
+</script>
+</body>
+</html>
