@@ -429,7 +429,7 @@
     on.filter(function (p) { return p.country === oc; }).forEach(function (p) {
       var pr = providerRate(p, src, tgt, mid);
       var r = { id: "A-" + p.id, family: "A", title: "Convert in " + oName + " at " + p.name,
-        short: "Direct in " + oName + " (" + p.name + ")", providers: [p], notes: [],
+        short: p.name + " - " + tgt, providers: [p], notes: [],
         legs: [cvLeg(src, tgt, p, pr, oName), ttLeg(tgt, fees, ttDays, oName + " to " + dName)] };
       if (!pr.ok) unavailable(r, pr.msg); else r.available = true;
       if (tgt === "MYR") r.notes.push("Ringgit is not traded offshore. Offshore banks deliver MYR through onshore partners; confirm the payment is allowed under BNM foreign exchange policy.");
@@ -441,7 +441,7 @@
     on.filter(function (p) { return p.country === dc; }).forEach(function (p) {
       var pr = providerRate(p, src, tgt, mid);
       var r = { id: "B-" + p.id, family: "B", title: "Send " + src + " to " + dName + ", convert at " + p.name,
-        short: "Send " + src + ", convert at " + p.name, providers: [p], notes: [],
+        short: p.name + " - " + src, providers: [p], notes: [],
         legs: [ttLeg(src, fees, ttDays, oName + " to " + dName), cvLeg(src, tgt, p, pr, dName)] };
       if (!pr.ok) unavailable(r, pr.msg); else r.available = true;
       r.notes.push("Needs a " + src + " account in your company's name in " + dName + ".");
@@ -455,14 +455,14 @@
         cProv.forEach(function (p) {
           var pr = providerRate(p, src, tgt, mid);
           var r = { id: "C-" + p.id, family: "C", title: "Convert " + src + " already held in " + dName + " at " + p.name,
-            short: src + " held in " + dName + ", convert at " + p.name, providers: [p], notes: ["Uses an existing " + src + " balance in " + dName + "; no transfer."],
+            short: p.name + " - " + src + " held", providers: [p], notes: ["Uses an existing " + src + " balance in " + dName + "; no transfer."],
             legs: [cvLeg(src, tgt, p, pr, dName)] };
           if (!pr.ok) unavailable(r, pr.msg); else r.available = true;
           add(r);
         });
       } else {
         add(unavailable({ id: "C-off", family: "C", title: "Convert " + src + " already held in " + dName,
-          short: "Held in " + dc, providers: [], notes: [], legs: [] },
+          short: dc + " balance", providers: [], notes: [], legs: [] },
           "Turn on \"We already hold " + src + " in " + dName + "\" to include this route."));
       }
     }
@@ -475,7 +475,7 @@
       if (po && pd) {
         var pr1 = providerRate(po, src, "USD", mid), pr2 = providerRate(pd, "USD", tgt, mid);
         var corr = (+fees.usdCorrFeeUsd || 0) * mid("USD", src);
-        var r = { id: "D-usd", family: "D", title: title, short: "Via USD, " + po.name + " then " + pd.name,
+        var r = { id: "D-usd", family: "D", title: title, short: "Via USD: " + po.name + " + " + pd.name,
           providers: [po, pd], notes: ["Two conversions means two margins. Common when the corridor has no direct correspondent bank. Adds a USD correspondent fee and " + (+fees.usdExtraDays || 0) + " extra day(s)."],
           legs: [cvLeg(src, "USD", po, pr1, oName), ttLeg("USD", fees, ttDays + (+fees.usdExtraDays || 0), oName + " to " + dName + " via US correspondent", corr), cvLeg("USD", tgt, pd, pr2, dName)] };
         r.available = pr1.ok && pr2.ok;
@@ -502,7 +502,7 @@
     var ticketUsd = (+s.scenario.amount || 0) * mid(src, "USD"), rfqMin = +s.risk.rfqThresholdUsd || 0;
     on.filter(function (p) { return p.country === "ORIGIN"; }).forEach(function (p) {
       var pr = providerRate(p, src, tgt, mid);
-      var r = { id: "R-" + p.id, family: "R", title: "Dealer quote (RFQ) at your sending bank, then send " + tgt, short: "Dealer RFQ at your sending bank",
+      var r = { id: "R-" + p.id, family: "R", title: "Dealer quote (RFQ) at your sending bank, then send " + tgt, short: "Dealer RFQ",
         providers: [p], notes: ["A negotiated rate from the bank's dealing desk. Usually only offered for larger tickets; the rate is valid for minutes."],
         legs: [cvLeg(src, tgt, p, pr, oName + " dealing desk"), ttLeg(tgt, fees, ttDays, oName + " to " + dName)] };
       if (!pr.ok) unavailable(r, pr.msg);

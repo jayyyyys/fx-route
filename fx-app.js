@@ -127,10 +127,10 @@
     var rows = list.slice().sort(function (a, b) { return (b.ok ? b.netPerAmount : -Infinity) - (a.ok ? a.netPerAmount : -Infinity); }).map(function (r) {
       var f = r.route.family, isBest = m.cmp.best === r;
       var w = r.ok ? Math.max(3, (r.netPerAmount - base) / (hi - base) * 100) : 0;
-      return '<div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) auto;gap:10px;align-items:center;margin:6px 0">' +
-        '<div style="display:flex;gap:8px;align-items:center;min-width:0"><span class="fam fam-' + f + '">' + f + '</span><span style="font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(r.route.title) + '">' + esc(r.route.short) + "</span></div>" +
-        '<div style="height:16px;border-radius:6px;background:var(--card-2);overflow:hidden">' + (r.ok ? '<div style="height:100%;width:' + w.toFixed(1) + "%;border-radius:6px;background:var(--r" + f + ")" + (isBest ? ";box-shadow:inset 0 0 0 2px var(--accent)" : "") + '"></div>' : "") + "</div>" +
-        '<div class="num" style="font-size:.84rem;font-weight:700;text-align:right;white-space:nowrap">' + (r.ok ? FX.fmtMoney(r.netPerAmount, 0) + (isBest ? ' <span class="tag good">Best</span>' : "") : '<span class="hint">no rate</span>') + "</div></div>";
+      return '<div class="brow">' +
+        '<div class="b-name"><span class="fam fam-' + f + '">' + f + '</span><span class="b-lbl" title="' + esc(r.route.title) + '">' + esc(r.route.short) + "</span></div>" +
+        '<div class="b-track">' + (r.ok ? '<div style="height:100%;width:' + w.toFixed(1) + "%;border-radius:6px;background:var(--r" + f + ")" + (isBest ? ";box-shadow:inset 0 0 0 2px var(--accent)" : "") + '"></div>' : "") + "</div>" +
+        '<div class="num b-val">' + (r.ok ? FX.fmtMoney(r.netPerAmount, 0) + (isBest ? ' <span class="tag good">Best</span>' : "") : '<span class="hint">no rate</span>') + "</div></div>";
     }).join("");
     return rows + '<p class="hint" style="margin-bottom:0">' + m.tgt + " received per " + money(m.src, m.amount, 0) + ", after fees. Bars start at " + FX.fmtMoney(base, 0) + ", not zero, so small gaps look bigger than they are." + (short ? "" : " Routes that move money first carry transit risk.") + "</p>";
   }
@@ -214,9 +214,9 @@
       var lim = Math.max(5, Math.abs(lo), Math.abs(hi));
       $("ovSources").innerHTML = (rows.length ? rows.map(function (r) {
         var pos = 50 + (isFinite(r.dev) ? r.dev / lim * 45 : 0);
-        return '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:10px;align-items:center;margin:5px 0;font-size:.84rem">' +
-          "<span>" + esc(srcLabel(r.src)) + '</span><span style="position:relative;height:14px;border-radius:7px;background:var(--card-2)"><span style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--faint)"></span><span style="position:absolute;top:2px;width:10px;height:10px;border-radius:50%;left:calc(' + pos.toFixed(1) + '% - 5px);background:' + (r.used ? "var(--brand)" : "var(--bad-dot)") + '"></span></span>' +
-          '<span class="num">' + (isFinite(r.dev) ? FX.fmtSigned(r.dev, 1) + " bps" : "—") + (r.used ? "" : r.rejected ? ' <span class="tag bad">outlier</span>' : ' <span class="tag warn">stale</span>') + "</span></div>";
+        return '<div class="srow">' +
+          '<span class="s-lbl">' + esc(srcLabel(r.src)) + '</span><span class="s-track"><span style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--faint)"></span><span style="position:absolute;top:2px;width:10px;height:10px;border-radius:50%;left:calc(' + pos.toFixed(1) + '% - 5px);background:' + (r.used ? "var(--brand)" : "var(--bad-dot)") + '"></span></span>' +
+          '<span class="num s-val">' + (isFinite(r.dev) ? FX.fmtSigned(r.dev, 1) + " bps" : "—") + (r.used ? "" : r.rejected ? ' <span class="tag bad">outlier</span>' : ' <span class="tag warn">stale</span>') + "</span></div>";
       }).join("") : '<p class="hint">No source rates yet.</p>') +
         '<p class="hint" style="margin-bottom:0">Distance from the consensus mid (centre line). ' + cs.used + " of " + FX.SOURCES.length + " sources used" + (isFinite(cs.disp) ? ", widest " + cs.disp.toFixed(1) + " bps" : "") + ".</p>";
     }
@@ -331,21 +331,31 @@
     });
     return h.join(" ");
   }
+  function heroHtml(r, m, c) {
+    var isBest = r === c.best, tgt = m.tgt;
+    var notes = (r.route.notes || []).map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("");
+    return '<article class="route hero' + (isBest ? " best" : "") + '" data-id="' + esc(r.route.id) + '">' +
+      '<div class="h-top"><span class="r-rank">' + r.rank + '</span><span class="fam fam-' + r.route.family + '">' + r.route.family + "</span><h3>" + esc(r.route.title) + "</h3>" +
+      (isBest ? '<span class="tag good">Best option</span>' : '<span class="tag warn">' + FX.fmtSigned(r.edgeVsBest, 0) + " " + tgt + " vs best</span>") + "</div>" +
+      '<div class="legs">' + legsHtml(r, m.amount) + "</div>" +
+      '<div class="h-net"><span>They receive</span><b>' + money(tgt, r.net) + "</b></div>" +
+      '<div class="r-metrics"><div><div class="k">Effective rate</div><div class="v">' + FX.fmtRate(r.effRate) + '</div></div><div><div class="k">Cost vs mid</div><div class="v">' + FX.fmtBps(r.costBps) +
+      '</div></div><div><div class="k">Arrives in</div><div class="v">' + (r.totalDays ? r.totalDays + " business day" + (r.totalDays === 1 ? "" : "s") : "same day") + "</div></div></div>" +
+      (isBest ? "" : '<p class="h-vs">Best: ' + esc(c.best.route.short) + " · " + money(tgt, c.best.net, 0) + "</p>") +
+      (notes ? '<details><summary class="hint">Notes</summary><ul class="r-notes">' + notes + "</ul></details>" : "") + "</article>";
+  }
   function renderCompare(m) {
     if (!m.ok) { ["flows", "routeList", "naList", "bdBody", "codeBody"].forEach(function (id) { $(id).innerHTML = ""; }); $("naTitle").hidden = true; return; }
-    $("flows").innerHTML = m.results.map(function (r) { return flowHtml(r, m, true); }).join("");
     var c = m.cmp, tgt = m.tgt;
-    $("routeList").innerHTML = c.sorted.map(function (r) {
-      var isBest = r === c.best, sel = r.route.id === state.selected;
-      var notes = (r.route.notes || []).map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("");
-      return '<article class="route' + (isBest ? " best" : "") + (sel ? " sel" : "") + '" data-id="' + esc(r.route.id) + '">' +
-        '<div class="r-head"><div class="r-title"><span class="r-rank">' + r.rank + '</span><span class="fam fam-' + r.route.family + '">' + r.route.family + "</span>" + esc(r.route.title) + "</div>" +
-        (isBest ? '<span class="tag good">Best option</span>' : '<span class="tag plain">' + FX.fmtSigned(r.edgeVsBest, 0) + " " + tgt + " vs best</span>") + "</div>" +
-        '<div class="legs">' + legsHtml(r, m.amount) + "</div>" +
-        '<div class="r-metrics"><div><div class="k">They receive</div><div class="v">' + money(tgt, r.net) + '</div></div><div><div class="k">Effective rate</div><div class="v">' + FX.fmtRate(r.effRate) +
-        '</div></div><div><div class="k">Cost vs mid</div><div class="v">' + FX.fmtBps(r.costBps) + '</div></div><div><div class="k">Arrives in</div><div class="v">' + (r.totalDays ? r.totalDays + " business day" + (r.totalDays === 1 ? "" : "s") : "same day") + "</div></div></div>" +
-        (notes ? '<details><summary class="hint">Notes</summary><ul class="r-notes">' + notes + "</ul></details>" : "") +
-        '<div style="display:flex;justify-content:flex-end;margin-top:6px"><button type="button" class="btn small" data-sel="' + esc(r.route.id) + '" aria-pressed="' + sel + '">' + (sel ? "Showing fees" : "Show fees") + "</button></div></article>";
+    var heroR = c.sorted.filter(function (r) { return r.route.id === state.selected; })[0] || c.best;
+    state.selected = heroR.route.id;
+    var spread = Math.max(1e-9, c.best.net - c.sorted[c.sorted.length - 1].net);
+    $("routeList").innerHTML = heroHtml(heroR, m, c);
+    $("flows").innerHTML = c.sorted.filter(function (r) { return r !== heroR; }).map(function (r) {
+      var isBest = r === c.best, gap = Math.min(1, Math.max(0, (c.best.net - r.net) / spread));
+      var who = r.route.legs.filter(function (L) { return L.t === "convert"; }).map(function (L) { return esc(L.provider); }).join(" + ") || "Direct";
+      return '<button type="button" class="tile' + (isBest ? " is-best" : "") + '" data-sel="' + esc(r.route.id) + '" style="--gap:' + gap.toFixed(2) + '"><span class="t-rank">' + r.rank + '</span><span class="t-title">' + esc(r.route.short || r.route.title) +
+        '</span><span class="t-delta">' + (isBest ? "Best" : FX.fmtSigned(r.edgeVsBest, 0)) + '</span><span class="t-bar"><i></i></span><span class="t-who">' + who + "</span></button>";
     }).join("");
     $("naTitle").hidden = !m.unavailable.length;
     $("naList").innerHTML = m.unavailable.map(function (r) {
@@ -376,7 +386,7 @@
     $("bdBody").innerHTML = rows.join("");
     var tot = Math.max(r.totalCost, 1e-9), mPct = Math.max(0, Math.min(100, r.fxMargin / tot * 100));
     $("split").innerHTML = '<span class="m" style="width:' + mPct.toFixed(1) + '%"></span><span class="f" style="width:' + (100 - mPct).toFixed(1) + '%"></span>';
-    $("splitText").textContent = "FX margin is " + mPct.toFixed(0) + "% of the cost. " + (mPct > 80 ? "Negotiating the rate matters far more than the fees." : "Fees are a meaningful part of the cost at this amount.");
+    $("splitText").textContent = "FX margin " + mPct.toFixed(0) + "% · Fees " + (100 - mPct).toFixed(0) + "%";
     var hasTT = r.route.legs.some(function (L) { return L.t === "transfer"; });
     $("codeBody").innerHTML = !hasTT ? '<tr><td colspan="4">No SWIFT transfer on this route, so the charge code does not apply.</td></tr>' : ["OUR", "SHA", "BEN"].map(function (code) {
       var s2 = FX.clone(C); s2.fees.code = code;
@@ -451,16 +461,16 @@
     else if (m.midInfo.how === "fallback") add("bad", "Using illustrative fallback rates", "No source rates are available. Check Sources & health, or edit the fallback mids.");
     else if (m.midInfo.how === "stale") add("warn", "Market rates are old", "Sources are more than 2 business days old. Amounts are indicative only.");
     var usd = m.amount * m.mid(src, "USD");
-    if (usd >= (+C.risk.rfqThresholdUsd || Infinity) && best.route.legs.some(function (x) { return x.t === "convert" && x.kind === "board"; })) add("info", "Ask for a dealer quote (RFQ)", "About USD " + FX.fmtMoney(usd, 0) + " is above your RFQ threshold. Banks usually beat their board rate at this size.");
-    if (c.withinNoise) add("warn", "The winning margin is within market noise", "A one-day move of about " + tgt + " " + FX.fmtMoney(c.band, 0) + " could flip the result. Converting before sending removes this risk.");
+    if (usd >= (+C.risk.rfqThresholdUsd || Infinity) && best.route.legs.some(function (x) { return x.t === "convert" && x.kind === "board"; })) add("info", "Dealer quote (RFQ) threshold reached", "About USD " + FX.fmtMoney(usd, 0) + " is above your RFQ threshold.");
+    if (c.withinNoise) add("warn", "The winning margin is within market noise", "A one-day move of about " + tgt + " " + FX.fmtMoney(c.band, 0) + " could change the ranking.");
     if (best.exposureDays) add("info", "Money is unconverted in transit", best.exposureDays + " business day(s) exposed to " + src + "/" + tgt + " moves.");
-    if (C.fees.code !== "OUR" && best.route.legs.some(function (x) { return x.t === "transfer"; })) add("warn", "Paying a supplier invoice?", "With " + C.fees.code + ", the beneficiary receives less than the invoice. Use OUR, or the invoice may be short-paid.");
+    if (C.fees.code !== "OUR" && best.route.legs.some(function (x) { return x.t === "transfer"; })) add("warn", "Supplier invoice", "With " + C.fees.code + ", the beneficiary receives the invoice less charges. OUR delivers the full amount.");
     var day = now.getDay(), hm = FX.hhmm(now), cutoff = String(C.risk.cutoff || "15:00");
     if (day === 0 || day === 6) add("warn", "Weekend", "Transfers start on the next business day. The rate may change by then.");
     else if (hm > cutoff) add("warn", "Past the " + cutoff + " cut-off", "Instructions now are usually value-dated the next business day" + (day === 5 ? " (Monday)" : "") + ".");
     else add("good", "Before the " + cutoff + " cut-off", "Instructions sent now can usually go out today. Cut-offs vary by bank and currency.");
     add("info", "Public holidays are not modelled", "A holiday in either country adds at least a day to routes with a transfer.");
-    add("info", "Supporting documents", "Large cross-border payments usually need a stated purpose and documents. Never split a payment to stay under a threshold.");
+    add("info", "Supporting documents", "Purpose of payment and supporting documents are typically requested at this size.");
     (best.route.notes || []).forEach(function (n) { add("info", "About the recommended route", n); });
     m.unavailable.filter(function (r) { return /sanity band/.test(r.err || ""); }).forEach(function (r) { add("bad", "Typed quote rejected: " + r.route.short, r.err); });
     return L;
@@ -602,7 +612,7 @@
     var up = upCount(), all = FX.SOURCES.length, lvl = up === all ? "live" : up > 0 ? "warn" : "bad";
     var label = state.paused ? "Paused" : lvl === "live" ? "Live" : lvl === "warn" ? "Partial " + up + "/" + all : (state.cachedAt ? "Offline, saved" : "Offline");
     dot.className = "dot" + (state.paused ? "" : " " + lvl);
-    txt.innerHTML = "<strong>" + label + "</strong> · " + FX.hhmm(state.lastCheck) + " · " + esc(nextText());
+    dot.title = label; txt.textContent = "Last updated " + FX.hhmm(state.lastCheck);
   }
   function renderBanners(m) {
     var b = $("banner"), up = upCount();
@@ -663,6 +673,7 @@
     document.title = VIEWS[v] + " · FX Comparison";
     closeNav();
     renderAll();
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }
 
   /* ---------- Refresh cycle ---------- */
@@ -739,7 +750,7 @@
   function openNav() { $("fxapp").classList.add("nav-open"); $("menuBtn").setAttribute("aria-expanded", "true"); }
   function closeNav() { $("fxapp").classList.remove("nav-open"); $("menuBtn").setAttribute("aria-expanded", "false"); }
   function applyThemeLabel() {
-    var t = document.documentElement.getAttribute("data-theme") || "system";
+    var t = document.documentElement.getAttribute("data-theme") || "light";
     $("themeBtn").setAttribute("aria-label", "Theme: " + (t === "system" ? "follow system" : t) + ". Click to change.");
     $("themeBtn").title = "Theme: " + (t === "system" ? "system" : t);
   }
@@ -763,7 +774,7 @@
     renderAll();
   }
   $("themeBtn").addEventListener("click", function () {
-    var t = document.documentElement.getAttribute("data-theme"), next = !t ? "light" : t === "light" ? "dark" : null;
+    var t = document.documentElement.getAttribute("data-theme") || "light", next = t === "light" ? "dark" : "light";
     if (next) document.documentElement.setAttribute("data-theme", next); else document.documentElement.removeAttribute("data-theme");
     try { if (next) localStorage.setItem(THEME_KEY, next); else localStorage.removeItem(THEME_KEY); } catch (e) {}
     applyThemeLabel(); renderView();

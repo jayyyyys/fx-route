@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FX Comparison · live rates, routes and fees</title>
 <link rel="stylesheet" href="fx-theme.css">
+<link rel="stylesheet" href="fx-remodel.css">
 <script>/* apply saved theme before paint to avoid a flash */
-try { var t = localStorage.getItem("fxapp.theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+try { var t = localStorage.getItem("fxapp.theme"); document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light"); } catch (e) {}
 </script>
 </head>
 <body>
@@ -107,7 +108,7 @@ try { var t = localStorage.getItem("fxapp.theme"); if (t === "light" || t === "d
 
       <!-- ===== 1. Bank rates ===== -->
       <section class="view" id="v-rates" aria-labelledby="h-rates" hidden>
-        <div class="view-head"><div><h2 id="h-rates">1 · Bank rates</h2><p>Every enabled provider for this pair, ranked by what you would receive before transfer fees. Margins are illustrative until you type a real quote.</p></div><a class="btn" href="fx-inputs.html#providers">Edit providers →</a></div>
+        <div class="view-head"><div><h2 id="h-rates">1 · Bank rates</h2><p>Providers ranked by amount received, before transfer fees.</p></div><a class="btn" href="fx-inputs.html#providers">Edit providers →</a></div>
         <div class="panel"><div class="tbl-wrap"><table>
           <thead><tr><th>#</th><th>Provider</th><th class="num">Rate</th><th class="num">Margin vs mid</th><th class="num">You receive</th><th class="num">vs best</th><th>Basis</th></tr></thead>
           <tbody id="provBody"></tbody></table></div>
@@ -118,31 +119,31 @@ try { var t = localStorage.getItem("fxapp.theme"); if (t === "light" || t === "d
 
       <!-- ===== 2. Compare ===== -->
       <section class="view" id="v-compare" aria-labelledby="h-compare" hidden>
-        <div class="view-head"><div><h2 id="h-compare">2 · Compare routes</h2><p>Each route is a chain of transfers and conversions. Rate and fees are combined, so the ranking is all-in.</p></div></div>
-        <div class="panel"><div class="p-head"><h3><span class="stepno">1</span>Scenarios</h3><span class="hint">Select a card to see its fees.</span></div><div class="flows" id="flows"></div></div>
-        <div class="grid-21" style="margin-top:14px">
-          <div><h2 style="margin-top:0">Ranked <small>best highlighted</small></h2><div class="routes" id="routeList"></div>
-            <h3 style="margin-top:16px" id="naTitle">Not available for this scenario</h3><div class="routes" id="naList"></div></div>
-          <div class="bd">
-            <div class="panel"><h3>Fees and cost <small id="bdRoute"></small></h3>
-              <div class="tbl-wrap"><table><tbody id="bdBody"></tbody></table></div>
-              <div style="margin-top:12px"><b>Where the cost goes</b><div class="split" id="split" aria-hidden="true"></div>
-                <div class="keys"><span><i style="background:var(--brand)"></i>FX margin</span><span><i style="background:var(--warn-dot)"></i>Fees</span></div>
-                <p class="hint" id="splitText"></p></div>
-            </div>
-            <div class="panel"><h3>SWIFT charge code</h3>
-              <div class="seg" role="group" aria-label="SWIFT charge code" id="codeSeg"><button type="button" data-code="OUR">OUR</button><button type="button" data-code="SHA">SHA</button><button type="button" data-code="BEN">BEN</button></div>
-              <p class="hint" id="codeHelp"></p>
-              <div class="tbl-wrap"><table><thead><tr><th>Code</th><th class="num">You pay</th><th class="num">They receive</th><th class="num">Cost</th></tr></thead><tbody id="codeBody"></tbody></table></div>
-              <h3 style="margin-top:14px">SWIFT / BIC on this route</h3><div id="bicList" class="hint"></div>
+        <div class="view-head"><div><h2 id="h-compare">2 · Compare routes</h2><p>Pick any square to bring it forward.</p></div></div>
+        <div class="stage">
+          <div class="stage-main">
+            <div id="routeList" class="routes"></div>
+            <div class="bd">
+              <div class="panel"><h3>Fees and cost <small id="bdRoute"></small></h3>
+                <div class="tbl-wrap"><table><tbody id="bdBody"></tbody></table></div>
+                <div class="split-box"><div class="split" id="split" aria-hidden="true"></div>
+                  <div class="keys"><span><i style="background:var(--brand)"></i>FX margin</span><span><i style="background:var(--warn-dot)"></i>Fees</span></div>
+                  <p class="hint" id="splitText"></p></div></div>
+              <div class="panel"><h3>SWIFT charge code</h3>
+                <div class="seg" role="group" aria-label="SWIFT charge code" id="codeSeg"><button type="button" data-code="OUR">OUR</button><button type="button" data-code="SHA">SHA</button><button type="button" data-code="BEN">BEN</button></div>
+                <p class="hint" id="codeHelp"></p>
+                <div class="tbl-wrap"><table><thead><tr><th>Code</th><th class="num">You pay</th><th class="num">They receive</th><th class="num">Cost</th></tr></thead><tbody id="codeBody"></tbody></table></div>
+                <h3 style="margin-top:14px">SWIFT / BIC on this route</h3><div id="bicList" class="hint"></div></div>
             </div>
           </div>
+          <aside class="tiles-wrap" aria-label="Other routes"><div class="flows" id="flows"></div>
+            <h3 id="naTitle">Not available</h3><div class="routes" id="naList"></div></aside>
         </div>
       </section>
 
       <!-- ===== 3. Your quote ===== -->
       <section class="view" id="v-quote" aria-labelledby="h-quote" hidden>
-        <div class="view-head"><div><h2 id="h-quote">3 · Check your bank's quote</h2><p>Type the rate your bank or dealer gave you. You will see its hidden margin, what it costs you, and how it ranks.</p></div></div>
+        <div class="view-head"><div><h2 id="h-quote">3 · Check your bank's quote</h2><p>Enter a bank or dealer rate to see its margin, cost and rank.</p></div></div>
         <div class="grid-2">
           <div class="panel">
             <form id="qForm" novalidate>
@@ -288,5 +289,6 @@ P(edge lost) = Φ(−edge / band)</pre><p>Assumes normal daily moves. Real FX ha
 
 <script src="fx-core.js"></script>
 <script src="fx-app.js"></script>
+<script src="fx-remodel.js"></script>
 </body>
 </html>
