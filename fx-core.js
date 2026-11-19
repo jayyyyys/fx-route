@@ -1,4 +1,4 @@
-/* fx-core.js - shared engine for fx-board.html and fx-inputs.html.
+/* fx-core.js - shared engine for index.html (dashboard) and fx-inputs.html (settings).
    Plain JavaScript, no libraries. Exposes window.FX.
    Methodology follows the FX Comparison methodology (consensus mid, markup model,
    route legs, OUR/SHA/BEN, cost vs mid, edge, transit band). Demo use only. */
@@ -135,18 +135,27 @@
     return n;
   }
 
-  /* ---------- Sources (same endpoints and shapes as app/adapters.py) ---------- */
+  /* ---------- Sources (all keyless, CORS-enabled, browser-callable) ---------- */
   var FRANKFURTER = "https://api.frankfurter.dev";
   var FAWAZ = [
     "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json",
     "https://latest.currency-api.pages.dev/v1/currencies/usd.json"
   ];
   var SOURCES = [
-    { id: "frankfurter", label: "Frankfurter", sub: "central-bank blend", type: "central_bank_ref", cadence: "Daily" },
-    { id: "bnm", label: "Bank Negara Malaysia", sub: "via Frankfurter", type: "central_bank_ref", cadence: "Sessions 09:00, 11:30, 12:00, 17:00 MYT" },
-    { id: "fawaz", label: "fawazahmed0", sub: "currency-api, aggregated", type: "aggregator_mid", cadence: "Daily" }
+    { id: "frankfurter", label: "Frankfurter", sub: "blend of central-bank reference rates", type: "central_bank_ref", cadence: "Daily, per central bank", minMs: 5 * 60e3,
+      url: "https://frankfurter.dev" },
+    { id: "bnm", label: "Bank Negara Malaysia", sub: "BNM reference, via Frankfurter", type: "central_bank_ref", cadence: "Sessions 09:00, 11:30, 12:00, 17:00 MYT", minMs: 10 * 60e3,
+      url: "https://frankfurter.dev/providers/bnm/" },
+    { id: "fawaz", label: "fawazahmed0", sub: "currency-api, open data", type: "aggregator_mid", cadence: "Daily", minMs: 15 * 60e3,
+      url: "https://github.com/fawazahmed0/exchange-api" },
+    { id: "erapi", label: "ExchangeRate-API", sub: "open access endpoint", type: "aggregator_mid", cadence: "Daily (about 00:00 UTC)", minMs: 60 * 60e3,
+      url: "https://www.exchangerate-api.com", attribution: true },
+    { id: "floatrates", label: "FloatRates", sub: "daily feed", type: "aggregator_mid", cadence: "About every 12 hours", minMs: 60 * 60e3,
+      url: "https://www.floatrates.com" },
+    { id: "coinbase", label: "Coinbase", sub: "fiat reference rates", type: "intraday_ref", cadence: "Intraday (refreshed each check)", minMs: 55e3,
+      url: "https://docs.cdp.coinbase.com/coinbase-app/track-apis/exchange-rates" }
   ];
-  var TYPE_LABEL = { central_bank_ref: "Central-bank ref", aggregator_mid: "Aggregator mid" };
+  var TYPE_LABEL = { central_bank_ref: "Central-bank ref", aggregator_mid: "Aggregator mid", intraday_ref: "Intraday ref" };
 
   function num(x) { var n = Number(x); if (!isFinite(n) || n <= 0) throw new Error("invalid rate"); return n; }
   function parseDay(s) {
@@ -159,6 +168,7 @@
     var t = setTimeout(function () { ctl.abort(); }, 10000);
     return fetch(url, { signal: ctl.signal, cache: "no-store" }).then(function (r) {
       clearTimeout(t);
+      if (r.status === 429) throw new Error("rate limited (HTTP 429), will retry later");
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     }, function (e) {
@@ -166,6 +176,18 @@
       throw new Error(e && e.name === "AbortError" ? "timed out" : "network error (blocked, offline or CORS)");
     });
   }
+  // Builds { CCY: { rate (per 1 USD), date } } from a { ccy: value } table.
+  function tableToPerUsd(tbl, date, lower) {
+    var out = { USD: { rate: 1, date: date } };
+    ALL.forEach(function (c) {
+      if (c === "USD") return;
+      var v = tbl[lower ? c.toLowerCase() : c];
+      if (v != null) { try { out[c] = { rate: num(typeof v === "object" ? v.rate : v), date: date }; } catch (e) { /* skip */ } }
+    });
+    if (Object.keys(out).length < 2) throw new Error("no usable rates");
+    return out;
+  }
+
   function fetchFrankfurter() {
     var others = ALL.filter(function (c) { return c !== "USD"; });
     return getJson(FRANKFURTER + "/v2/rates?base=USD&quotes=" + others.join(",")).then(function (rows) {
@@ -207,19 +229,48 @@
     function attempt() {
       if (i >= FAWAZ.length) return Promise.reject(new Error("all mirrors failed: " + (lastErr && lastErr.message)));
       return getJson(FAWAZ[i++]).then(function (data) {
-        var d = parseDay(data.date), tbl = data.usd || {}, out = { USD: { rate: 1, date: d } };
-        ALL.forEach(function (c) { var v = tbl[c.toLowerCase()]; if (c !== "USD" && v != null) { try { out[c] = { rate: num(v), date: d }; } catch (e) {} } });
-        if (Object.keys(out).length < 2) throw new Error("no usable rates");
-        return out;
+        return tableToPerUsd(data.usd || {}, parseDay(data.date), true);
       }).catch(function (e) { lastErr = e; return attempt(); });
     }
     return attempt();
   }
-  var FETCHERS = { frankfurter: fetchFrankfurter, bnm: fetchBNM, fawaz: fetchFawaz };
+  function fetchErApi() {
+    return getJson("https://open.er-api.com/v6/latest/USD").then(function (d) {
+      if (!d || d.result !== "success" || !d.rates) throw new Error("unexpected response");
+      var at = d.time_last_update_unix ? new Date(d.time_last_update_unix * 1000) : new Date();
+      return tableToPerUsd(d.rates, at, false);
+    });
+  }
+  function fetchFloat() {
+    return getJson("https://www.floatrates.com/daily/usd.json").then(function (d) {
+      if (!d || typeof d !== "object") throw new Error("unexpected response");
+      var any = d.myr || d.sgd || d.thb, at = any && any.date ? new Date(any.date) : null;
+      if (!at || isNaN(at)) at = new Date();
+      return tableToPerUsd(d, at, true);
+    });
+  }
+  function fetchCoinbase() {
+    return getJson("https://api.coinbase.com/v2/exchange-rates?currency=USD").then(function (d) {
+      if (!d || !d.data || !d.data.rates) throw new Error("unexpected response");
+      return tableToPerUsd(d.data.rates, new Date(), false); // no timestamp in payload: time of fetch
+    });
+  }
+  var FETCHERS = { frankfurter: fetchFrankfurter, bnm: fetchBNM, fawaz: fetchFawaz, erapi: fetchErApi, floatrates: fetchFloat, coinbase: fetchCoinbase };
 
-  function fetchAll() {
-    var perUsd = {}, health = {};
+  // Polite fetching: each source is called at most once per minMs (the free sources publish daily).
+  var lastFetch = {};
+  function fetchAll(force) {
+    var perUsd = {}, health = {}, nowMs = Date.now();
     return Promise.all(SOURCES.map(function (s) {
+      var lf = lastFetch[s.id];
+      if (!force && lf && lf.ok && nowMs - lf.t < s.minMs) {
+        perUsd[s.id] = lf.data; health[s.id] = Object.assign({}, lf.health, { cached: true });
+        return null;
+      }
+      if (force && lf && lf.ok && nowMs - lf.t < 20e3) { // even "Refresh now" does not hammer a source
+        perUsd[s.id] = lf.data; health[s.id] = Object.assign({}, lf.health, { cached: true });
+        return null;
+      }
       var t0 = performance.now();
       return FETCHERS[s.id]().then(function (data) {
         var partial = data._partial || []; delete data._partial;
@@ -227,10 +278,52 @@
         var newest = null;
         Object.keys(data).forEach(function (c) { if (!newest || data[c].date > newest) newest = data[c].date; });
         health[s.id] = { ok: true, partial: partial, ms: Math.round(performance.now() - t0), at: new Date().toISOString(), newest: newest && newest.toISOString() };
+        lastFetch[s.id] = { t: Date.now(), ok: true, data: data, health: health[s.id] };
       }, function (e) {
         health[s.id] = { ok: false, err: e.message, ms: Math.round(performance.now() - t0), at: new Date().toISOString() };
+        lastFetch[s.id] = { t: Date.now(), ok: false };
       });
     })).then(function () { return { perUsd: perUsd, health: health }; });
+  }
+
+  /* ---------- History (Frankfurter time series, cached per pair and range) ---------- */
+  var histCache = {};
+  function isoDay(d) { return d.toISOString().slice(0, 10); }
+  function fetchHistory(b, q, days) {
+    var key = b + "/" + q + "/" + days, hit = histCache[key];
+    if (hit && Date.now() - hit.t < 30 * 60e3) return Promise.resolve(hit.rows);
+    var from = new Date(Date.now() - days * 864e5);
+    var url = FRANKFURTER + "/v2/rates?base=" + b + "&quotes=" + q + "&from=" + isoDay(from) + (days > 400 ? "&group=week" : "");
+    return getJson(url).then(function (rows) {
+      if (!Array.isArray(rows)) throw new Error("unexpected response shape");
+      var out = [];
+      rows.forEach(function (r) {
+        try { if (String(r.quote).toUpperCase() === q) out.push({ date: parseDay(r.date), rate: num(r.rate) }); } catch (e) { /* skip */ }
+      });
+      out.sort(function (x, y) { return x.date - y.date; });
+      if (out.length < 2) throw new Error("not enough history");
+      histCache[key] = { t: Date.now(), rows: out };
+      return out;
+    });
+  }
+  function histStats(rows) {
+    var rs = rows.map(function (r) { return r.rate; }), n = rs.length;
+    var lo = Math.min.apply(null, rs), hi = Math.max.apply(null, rs), last = rs[n - 1], first = rs[0];
+    var lr = [];
+    for (var i = 1; i < n; i++) lr.push(Math.log(rs[i] / rs[i - 1]));
+    var mean = lr.reduce(function (a, b) { return a + b; }, 0) / (lr.length || 1);
+    var v = lr.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / Math.max(1, lr.length - 1);
+    var span = (rows[n - 1].date - rows[0].date) / 864e5, perYear = span > 0 ? lr.length / span * 365 : 252;
+    return { lo: lo, hi: hi, last: last, first: first, chgPct: (last / first - 1) * 100,
+      pctile: hi > lo ? (last - lo) / (hi - lo) * 100 : 50, annVolPct: Math.sqrt(v * perYear) * 100 };
+  }
+
+  // Hours between the oldest and newest source timestamp in a consensus (the "rates are X h apart" warning).
+  function timeGapHours(rows) {
+    var used = rows.filter(function (r) { return r.used; });
+    if (used.length < 2) return 0;
+    var ts = used.map(function (r) { return r.date.getTime(); });
+    return (Math.max.apply(null, ts) - Math.min.apply(null, ts)) / 36e5;
   }
 
   /* ---------- Consensus mid ---------- */
@@ -591,6 +684,7 @@
     COUNTRY_OF: COUNTRY_OF, COUNTRY_NAME: COUNTRY_NAME, KIND_LABEL: KIND_LABEL, SOURCES: SOURCES, TYPE_LABEL: TYPE_LABEL,
     clone: clone, loadSettings: loadSettings, saveSettings: saveSettings, mergeDefaults: mergeDefaults,
     saveSnapshot: saveSnapshot, loadSnapshot: loadSnapshot, fetchAll: fetchAll,
+    fetchHistory: fetchHistory, histStats: histStats, timeGapHours: timeGapHours,
     consensus: consensus, consensusOfRates: consensusOfRates, makeMid: makeMid, businessDaysOld: businessDaysOld,
     providerRate: providerRate, quoteToRate: quoteToRate, sanity: sanity,
     buildRoutes: buildRoutes, evaluate: evaluate, compare: compare, normCdf: normCdf, bps: bps,

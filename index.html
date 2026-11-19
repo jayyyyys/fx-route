@@ -3,716 +3,290 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FX Route Planner · live rates and route comparison</title>
+<title>FX Comparison · live rates, routes and fees</title>
 <link rel="stylesheet" href="fx-theme.css">
-<style>
-  /* Scenario bar */
-  .scenario { display: grid; gap: 14px; }
-  .scn-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(110px, .7fr) auto minmax(110px, .7fr); gap: 10px; align-items: end; }
-  @media (max-width: 720px) { .scn-row { grid-template-columns: 1fr auto 1fr; } .scn-row .amt { grid-column: 1 / -1; } }
-  .amt .input { font-size: 1.25rem; font-weight: 700; }
-  .scn-foot { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; justify-content: space-between; }
-  .presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .presets span { color: var(--muted); font-size: .88rem; margin-right: 2px; }
-  .midline { font-size: .95rem; color: var(--muted); }
-  .midline b { color: var(--ink); }
-
-  /* Verdict */
-  .verdict {
-    border-radius: var(--radius); padding: 20px 22px; background: var(--accent-soft); color: var(--accent-ink);
-    border: 1px solid var(--accent-line); display: grid; gap: 6px;
-  }
-  .verdict .eyebrow { font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
-  .verdict .headline { font-size: 1.45rem; font-weight: 700; line-height: 1.25; }
-  .verdict p { margin: 0; color: var(--ink); }
-  .verdict .caution { margin-top: 6px; padding: 8px 14px; border-radius: 14px; background: var(--warn-soft); color: var(--warn-ink); }
-  .verdict.bad { background: var(--bad-soft); color: var(--bad-ink); border-color: transparent; }
-
-  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-  @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
-  .stat .k { font-size: .85rem; color: var(--muted); }
-  .stat .v { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums lining-nums; overflow-wrap: anywhere; }
-  .stat .s { font-size: .82rem; color: var(--muted); }
-  .stat.hl .v { color: var(--accent-ink); }
-
-  .story { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-  @media (max-width: 860px) { .story { grid-template-columns: minmax(0, 1fr); } }
-  .step { border-radius: 20px; padding: 14px 16px; background: var(--brand-soft); color: var(--brand-ink); min-width: 0; }
-  .step .n { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; background: var(--card); font-weight: 700; margin-right: 6px; }
-  .step .t { font-weight: 700; }
-  .step p { margin: 6px 0 0; color: var(--ink); font-size: .95rem; }
-
-  /* Routes */
-  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-  .routes { display: grid; gap: 12px; }
-  .route {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px;
-    box-shadow: var(--shadow); cursor: pointer; transition: opacity .2s, filter .2s, border-color .2s; min-width: 0;
-  }
-  .route.dim { opacity: .55; filter: grayscale(.7); }
-  .route.dim:hover, .route.dim:focus-within, .route.dim.sel { opacity: 1; filter: none; }
-  .route.best { border: 2px solid var(--accent); background: linear-gradient(0deg, var(--card), var(--card)) padding-box; }
-  .route.sel { box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow); }
-  .route.na { cursor: default; }
-  .r-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
-  .r-title { font-weight: 700; font-size: 1.08rem; }
-  .r-rank { display: inline-flex; min-width: 30px; height: 30px; border-radius: 999px; align-items: center; justify-content: center; background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; margin-right: 8px; padding: 0 8px; }
-  .route.best .r-rank { background: var(--accent); color: #0D2E07; }
-  .legs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0; }
-  .leg { padding: 3px 12px; border-radius: 999px; font-size: .86rem; border: 1px solid var(--line); background: var(--bg); }
-  .leg.ccy { background: var(--brand-soft); color: var(--brand-ink); border-color: transparent; font-weight: 700; }
-  .leg.tt { background: var(--warn-soft); color: var(--warn-ink); border-color: transparent; }
-  .arrow { color: var(--faint); }
-  .r-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  @media (max-width: 720px) { .r-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .r-metrics .k { font-size: .8rem; color: var(--muted); }
-  .r-metrics .v { font-weight: 700; font-variant-numeric: tabular-nums lining-nums; overflow-wrap: anywhere; }
-  .costbar { height: 8px; border-radius: 999px; background: var(--line); margin-top: 10px; overflow: hidden; }
-  .costbar span { display: block; height: 100%; border-radius: 999px; background: var(--faint); }
-  .route.best .costbar span { background: var(--accent); }
-  .r-notes { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: .88rem; }
-  .r-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
-  .na-list .route { opacity: .6; }
-
-  /* Breakdown */
-  .bd { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; }
-  @media (max-width: 900px) { .bd { grid-template-columns: minmax(0, 1fr); } }
-  .bd table td:first-child { color: var(--muted); }
-  .bd tr.total td { font-weight: 700; color: var(--ink); border-bottom: 2px solid var(--line); }
-  .bd tr.net td { font-weight: 700; color: var(--accent-ink); }
-  .bd tr.sub td:first-child { padding-left: 24px; }
-  .split { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--line); margin: 8px 0 6px; }
-  .split .m { background: var(--brand); }
-  .split .f { background: var(--warn-dot); }
-  .keys { display: flex; flex-wrap: wrap; gap: 12px; font-size: .85rem; color: var(--muted); }
-  .keys i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-  .code-help { margin: 10px 0; font-size: .92rem; }
-
-  /* Checks */
-  .checks { display: grid; gap: 10px; }
-  .check { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 12px 16px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
-  .check .ic { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
-  .check.info .ic { background: var(--brand-soft); color: var(--brand-ink); }
-  .check.warn .ic { background: var(--warn-soft); color: var(--warn-ink); }
-  .check.bad .ic { background: var(--bad-soft); color: var(--bad-ink); }
-  .check.good .ic { background: var(--accent-soft); color: var(--accent-ink); }
-  .check b { display: block; }
-  .check span { color: var(--muted); font-size: .92rem; }
-
-  /* Sources */
-  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-  @media (max-width: 900px) { .two { grid-template-columns: minmax(0, 1fr); } }
-  tr.bestrow td { background: var(--accent-soft); }
-  tr.bestrow td:first-child { border-radius: 14px 0 0 14px; }
-  tr.bestrow td:last-child { border-radius: 0 14px 14px 0; }
-
-  /* Market board */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; box-shadow: var(--shadow); text-align: left; width: 100%; cursor: pointer; }
-  .card:hover { border-color: var(--brand); }
-  .card[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft), var(--shadow); }
-  .card .pair { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-  .card .pair b { letter-spacing: .02em; }
-  .card .unit { color: var(--muted); font-size: .8rem; }
-  .card .mid { font-size: 1.6rem; font-weight: 700; margin: 2px 0; font-variant-numeric: tabular-nums lining-nums; }
-  .card .mid.flash { animation: flash 1.2s ease-out; border-radius: 10px; }
-  @keyframes flash { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
-  @media (prefers-reduced-motion: reduce) { .card .mid.flash { animation: none; } }
-  .card .meta { display: flex; justify-content: space-between; gap: 8px; font-size: .82rem; color: var(--muted); }
-  .spark { width: 100%; height: 30px; display: block; margin-top: 6px; }
-  .spark path { fill: none; stroke: var(--brand); stroke-width: 1.6; }
-  .up { color: var(--accent-ink); } .down { color: var(--bad-ink); }
-</style>
+<script>/* apply saved theme before paint to avoid a flash */
+try { var t = localStorage.getItem("fxapp.theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
 </head>
 <body>
-<div class="wrap" id="fxapp">
-  <header class="top">
-    <div class="brand">
-      <h1>FX Route Planner</h1>
-      <p>Live mid-market rates, every route compared, fees explained</p>
-      <span class="bar" aria-hidden="true"></span>
+<a class="skip" href="#content">Skip to content</a>
+<div class="app" id="fxapp">
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="side" id="side" aria-label="Main navigation">
+    <a class="logo" href="#/overview"><span class="mk">FX</span>FX Comparison</a>
+    <nav class="nav" aria-label="Pages">
+      <a href="#/overview" data-view="overview" data-guide="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</a>
+      <div class="nav-h">Your journey</div>
+      <div class="journey">
+        <a href="#/rates" data-view="rates" data-guide="rates"><span class="n">1</span><span><span class="t">Bank rates</span><span class="s">Every provider, ranked</span></span></a>
+        <a href="#/compare" data-view="compare" data-guide="compare"><span class="n">2</span><span><span class="t">Compare</span><span class="s">Best route, fees in</span></span></a>
+        <a href="#/quote" data-view="quote" data-guide="quote"><span class="n">3</span><span><span class="t">Your quote</span><span class="s">Type your bank's rate</span></span></a>
+        <a href="#/checklist" data-view="checklist" data-guide="checklist"><span class="n">4</span><span><span class="t">Checklist</span><span class="s">Before you call</span></span></a>
+      </div>
+      <div class="nav-h">Report</div>
+      <a href="#/sheet" data-view="sheet" data-guide="sheet"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>Full sheet</a>
+      <div class="nav-h">Market</div>
+      <a href="#/markets" data-view="markets" data-guide="markets"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M14 8h6v6"/></svg>Rates &amp; history</a>
+      <a href="#/sources" data-view="sources"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>Sources &amp; health</a>
+      <div class="nav-h">Help</div>
+      <a href="#/help" data-view="help"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>How it works</a>
+      <a href="fx-inputs.html" data-guide="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Rates &amp; assumptions</a>
+    </nav>
+    <div class="side-foot">
+      <button type="button" class="btn ghost" id="guideBtn2"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Take the guide</button>
+      Demo and educational use only. Not financial advice.
     </div>
-    <div class="controls">
-      <span class="pill" id="statusPill">
-        <span class="dot" id="statusDot" aria-hidden="true"></span>
-        <span id="statusText"><strong>Checking…</strong></span>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ===== Main ===== -->
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="iconbtn menu-btn" id="menuBtn" aria-label="Open navigation" aria-controls="side" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <h1 id="pageTitle">Overview</h1>
+      <span class="grow"></span>
+      <div class="seg" role="group" aria-label="Data mode" id="modeSeg" data-guide="mode">
+        <button type="button" data-mode="live" aria-pressed="true">Today's rates</button>
+        <button type="button" data-mode="example" aria-pressed="false">Sheet example</button>
+      </div>
+      <span class="pill" id="statusPill" data-guide="status" title="Source status">
+        <span class="dot" id="statusDot" aria-hidden="true"></span><span id="statusText"><strong>Checking…</strong></span>
       </span>
-      <button type="button" class="btn primary" id="refreshBtn">Refresh now</button>
-      <button type="button" class="btn" id="pauseBtn" aria-pressed="false">Pause</button>
-      <a class="btn" href="fx-inputs.html">Rates &amp; assumptions →</a>
-    </div>
-  </header>
-  <span class="sr" aria-live="polite" id="announce"></span>
+      <button type="button" class="btn" id="refreshBtn" title="Refresh rates (R)"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span>Refresh</span></button>
+      <button type="button" class="btn" id="pauseBtn" aria-pressed="false" title="Pause auto refresh">Pause</button>
+      <button type="button" class="iconbtn" id="themeBtn" aria-label="Theme: follow system" title="Theme"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+      <button type="button" class="btn" id="guideBtn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Guide</button>
+    </header>
+    <span class="sr" aria-live="polite" id="announce"></span>
 
-  <nav class="tabs" aria-label="Sections">
-    <a href="#summary">Summary</a><a href="#routes">All routes</a><a href="#breakdown">Fees &amp; SWIFT</a>
-    <a href="#checks">Checks</a><a href="#sources">Rate sources</a><a href="#board">Market board</a>
-  </nav>
+    <main class="content" id="content" tabindex="-1">
+      <div class="banner" id="banner" role="status"></div>
+      <div class="banner warn" id="gapBanner" role="status"></div>
 
-  <div class="banner" id="banner" role="status"></div>
-
-  <!-- Scenario -->
-  <section class="panel scenario" aria-label="Scenario">
-    <form class="scn-row" id="scnForm" novalidate>
-      <div class="field amt">
-        <label for="amt">You send</label>
-        <input class="input" id="amt" inputmode="decimal" autocomplete="off" aria-describedby="amtErr">
-      </div>
-      <div class="field">
-        <label for="fromCcy">From</label>
-        <select class="input" id="fromCcy"></select>
-      </div>
-      <button type="button" class="btn" id="swapBtn" aria-label="Swap currencies" title="Swap currencies">⇄</button>
-      <div class="field">
-        <label for="toCcy">To</label>
-        <select class="input" id="toCcy"></select>
-      </div>
-    </form>
-    <div class="err" id="amtErr"></div>
-    <div class="scn-foot">
-      <div class="presets" id="presets">
-        <span>Quick scenarios:</span>
-        <button type="button" class="btn small" data-preset="SGD,THB,1000000">SGD 1M → THB</button>
-        <button type="button" class="btn small" data-preset="SGD,MYR,500000">SGD 500k → MYR</button>
-        <button type="button" class="btn small" data-preset="MYR,USD,250000">MYR 250k → USD</button>
-        <button type="button" class="btn small" data-preset="USD,THB,200000">USD 200k → THB</button>
-      </div>
-      <label class="switch"><input type="checkbox" id="holdAbroad"> <span id="holdLabel">We already hold SGD in Thailand</span></label>
-    </div>
-    <div class="midline" id="midline">Market mid: —</div>
-  </section>
-
-  <!-- Summary -->
-  <section id="summary" aria-labelledby="sumTitle">
-    <h2 id="sumTitle">Summary and result</h2>
-    <div class="verdict" id="verdict" aria-live="polite"><div class="headline">Working out the best option…</div></div>
-    <div class="stats" id="stats"></div>
-    <div class="story" id="story"></div>
-  </section>
-
-  <!-- Routes -->
-  <section id="routes" aria-labelledby="routesTitle">
-    <h2 id="routesTitle">All routes <small>Best option highlighted. Select a route to see its fees.</small></h2>
-    <div class="legend">
-      <span class="tag good">Best option</span><span class="tag plain">Other options (greyed)</span>
-      <span class="leg ccy">Currency held</span><span class="leg">Conversion</span><span class="leg tt">Telegraphic transfer (SWIFT)</span>
-    </div>
-    <div class="routes" id="routeList"></div>
-    <h3 style="margin-top:18px" id="naTitle">Not available for this scenario</h3>
-    <div class="routes na-list" id="naList"></div>
-  </section>
-
-  <!-- Breakdown -->
-  <section id="breakdown" aria-labelledby="bdTitle">
-    <h2 id="bdTitle">Fees and cost breakdown <small id="bdRoute"></small></h2>
-    <div class="bd">
-      <div class="panel">
-        <div class="tbl-wrap"><table><tbody id="bdBody"></tbody></table></div>
-        <div style="margin-top:14px">
-          <b>Where the cost goes</b>
-          <div class="split" id="split" aria-hidden="true"></div>
-          <div class="keys"><span><i style="background:var(--brand)"></i>FX margin</span><span><i style="background:var(--warn-dot)"></i>Fees</span></div>
-          <p class="hint" id="splitText"></p>
+      <!-- Scenario bar: shared by every view -->
+      <section class="panel scn-wrap" aria-label="Scenario" id="scnWrap" data-guide="scenario">
+        <form class="scn" id="scnForm" novalidate>
+          <div class="field amt"><label for="amt">You send</label><input class="input" id="amt" inputmode="decimal" autocomplete="off" aria-describedby="amtErr"></div>
+          <div class="field"><label for="fromCcy">From</label><select class="input" id="fromCcy"></select></div>
+          <button type="button" class="iconbtn" id="swapBtn" aria-label="Swap currencies" title="Swap currencies">⇄</button>
+          <div class="field"><label for="toCcy">To</label><select class="input" id="toCcy"></select></div>
+          <div class="scn-meta" id="midline">Market mid: —</div>
+        </form>
+        <div class="err" id="amtErr" role="alert"></div>
+        <div class="scn-foot">
+          <div class="presets" id="presets">
+            <span>Quick:</span>
+            <button type="button" class="btn small" data-preset="SGD,THB,1000000">SGD 1M → THB</button>
+            <button type="button" class="btn small" data-preset="SGD,MYR,500000">SGD 500k → MYR</button>
+            <button type="button" class="btn small" data-preset="MYR,USD,250000">MYR 250k → USD</button>
+            <button type="button" class="btn small" data-preset="USD,THB,200000">USD 200k → THB</button>
+          </div>
+          <label class="switch"><input type="checkbox" id="holdAbroad"> <span id="holdLabel">We already hold SGD in Thailand</span></label>
         </div>
-      </div>
-      <div class="panel">
-        <h3>SWIFT charge code</h3>
-        <div class="seg" role="group" aria-label="SWIFT charge code" id="codeSeg">
-          <button type="button" data-code="OUR">OUR</button><button type="button" data-code="SHA">SHA</button><button type="button" data-code="BEN">BEN</button>
+      </section>
+
+      <!-- ===== Overview ===== -->
+      <section class="view" id="v-overview" aria-labelledby="h-overview">
+        <div class="view-head"><div><h2 id="h-overview">Today at a glance</h2><p>The fair market rate, the best way to move your money, and how today compares with recent months.</p></div></div>
+        <div class="kpis" id="ovKpis"></div>
+        <div class="grid-21" style="margin-top:14px">
+          <div class="verdict" id="verdict" aria-live="polite"><div class="headline">Working out the best option…</div></div>
+          <div class="panel">
+            <div class="p-head"><h3>Is today a good day? <small id="ovPairLbl"></small></h3><a class="btn small" href="#/markets">History →</a></div>
+            <div id="ovTiming"><p class="hint">Loading history…</p></div>
+          </div>
         </div>
-        <p class="code-help" id="codeHelp"></p>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Code</th><th class="num">You pay</th><th class="num">They receive</th><th class="num">Cost vs mid</th></tr></thead>
-          <tbody id="codeBody"></tbody>
-        </table></div>
-        <h3 style="margin-top:18px">SWIFT / BIC codes on this route</h3>
-        <div id="bicList" class="hint"></div>
-      </div>
-    </div>
-  </section>
+        <div class="grid-2" style="margin-top:14px">
+          <div class="panel"><div class="p-head"><h3>Net received by route</h3><a class="btn small" href="#/compare">All routes →</a></div><div id="ovBars"></div></div>
+          <div class="panel"><div class="p-head"><h3>Sources agree?</h3><a class="btn small" href="#/sources">Details →</a></div><div id="ovSources"></div></div>
+        </div>
+        <div class="panel" style="margin-top:14px"><div class="p-head"><h3>Market board <small>select a pair to use it</small></h3></div><div class="cards" id="cards"></div></div>
+      </section>
 
-  <!-- Checks -->
-  <section id="checks" aria-labelledby="chkTitle">
-    <h2 id="chkTitle">Checks and edge cases <small>Things to confirm before you instruct the bank</small></h2>
-    <div class="checks" id="checkList"></div>
-  </section>
+      <!-- ===== 1. Bank rates ===== -->
+      <section class="view" id="v-rates" aria-labelledby="h-rates" hidden>
+        <div class="view-head"><div><h2 id="h-rates">1 · Bank rates</h2><p>Every enabled provider for this pair, ranked by what you would receive before transfer fees. Margins are illustrative until you type a real quote.</p></div><a class="btn" href="fx-inputs.html#providers">Edit providers →</a></div>
+        <div class="panel"><div class="tbl-wrap"><table>
+          <thead><tr><th>#</th><th>Provider</th><th class="num">Rate</th><th class="num">Margin vs mid</th><th class="num">You receive</th><th class="num">vs best</th><th>Basis</th></tr></thead>
+          <tbody id="provBody"></tbody></table></div>
+          <p class="hint">"You receive" = amount × rate, minus the provider's own fee. Transfer (SWIFT) fees are added on the Compare page.</p>
+        </div>
+        <div class="panel"><h3>Margin ladder <small>lower is better</small></h3><div id="ladder"></div></div>
+      </section>
 
-  <!-- Sources -->
-  <section id="sources" aria-labelledby="srcTitle">
-    <h2 id="srcTitle">Rate sources compared <small id="srcPair"></small></h2>
-    <div class="two">
-      <div class="panel">
-        <h3>Market mid sources</h3>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Source</th><th class="num">Rate</th><th class="num">vs mid</th><th>Date</th><th>Status</th></tr></thead>
-          <tbody id="midBody"></tbody>
-        </table></div>
-        <p class="hint">Median of fresh sources, after dropping any more than 50 bps from the first median.</p>
-      </div>
-      <div class="panel">
-        <h3>Customer rates by provider</h3>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Provider</th><th class="num">Rate</th><th class="num">Margin</th><th>Basis</th></tr></thead>
-          <tbody id="provBody"></tbody>
-        </table></div>
-        <p class="hint">Margins are illustrative unless you typed a quote. Edit them on <a href="fx-inputs.html#providers">Rates &amp; assumptions</a>.</p>
-      </div>
-    </div>
-  </section>
+      <!-- ===== 2. Compare ===== -->
+      <section class="view" id="v-compare" aria-labelledby="h-compare" hidden>
+        <div class="view-head"><div><h2 id="h-compare">2 · Compare routes</h2><p>Each route is a chain of transfers and conversions. Rate and fees are combined, so the ranking is all-in.</p></div></div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">1</span>Scenarios</h3><span class="hint">Select a card to see its fees.</span></div><div class="flows" id="flows"></div></div>
+        <div class="grid-21" style="margin-top:14px">
+          <div><h2 style="margin-top:0">Ranked <small>best highlighted</small></h2><div class="routes" id="routeList"></div>
+            <h3 style="margin-top:16px" id="naTitle">Not available for this scenario</h3><div class="routes" id="naList"></div></div>
+          <div class="bd">
+            <div class="panel"><h3>Fees and cost <small id="bdRoute"></small></h3>
+              <div class="tbl-wrap"><table><tbody id="bdBody"></tbody></table></div>
+              <div style="margin-top:12px"><b>Where the cost goes</b><div class="split" id="split" aria-hidden="true"></div>
+                <div class="keys"><span><i style="background:var(--brand)"></i>FX margin</span><span><i style="background:var(--warn-dot)"></i>Fees</span></div>
+                <p class="hint" id="splitText"></p></div>
+            </div>
+            <div class="panel"><h3>SWIFT charge code</h3>
+              <div class="seg" role="group" aria-label="SWIFT charge code" id="codeSeg"><button type="button" data-code="OUR">OUR</button><button type="button" data-code="SHA">SHA</button><button type="button" data-code="BEN">BEN</button></div>
+              <p class="hint" id="codeHelp"></p>
+              <div class="tbl-wrap"><table><thead><tr><th>Code</th><th class="num">You pay</th><th class="num">They receive</th><th class="num">Cost</th></tr></thead><tbody id="codeBody"></tbody></table></div>
+              <h3 style="margin-top:14px">SWIFT / BIC on this route</h3><div id="bicList" class="hint"></div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <!-- Market board -->
-  <section id="board" aria-labelledby="boardTitle">
-    <h2 id="boardTitle">Market board <small>Select a pair to use it as the scenario</small></h2>
-    <div class="grid" id="cards"></div>
-    <div class="two" style="margin-top:16px">
-      <div class="panel">
-        <h3>More currencies <small>vs MYR</small></h3>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Currency</th><th class="num">MYR per unit</th><th class="num">Spread</th><th class="num">Sources</th></tr></thead>
-          <tbody id="moreBody"></tbody>
-        </table></div>
-      </div>
-      <div class="panel">
-        <h3>Source health</h3>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Source</th><th>Status</th><th class="num">Response</th><th>Newest</th></tr></thead>
-          <tbody id="healthBody"></tbody>
-        </table></div>
-        <details style="margin-top:10px"><summary>What "Live" means</summary>
-          <p class="hint">Live means every source was checked in the last minute. The free sources publish daily (Frankfurter, fawazahmed0) or at set sessions (BNM), so numbers often stay the same between checks. For minute-level rates, add a paid intraday feed or a bank API on the server.</p>
-        </details>
-      </div>
-    </div>
-  </section>
+      <!-- ===== 3. Your quote ===== -->
+      <section class="view" id="v-quote" aria-labelledby="h-quote" hidden>
+        <div class="view-head"><div><h2 id="h-quote">3 · Check your bank's quote</h2><p>Type the rate your bank or dealer gave you. You will see its hidden margin, what it costs you, and how it ranks.</p></div></div>
+        <div class="grid-2">
+          <div class="panel">
+            <form id="qForm" novalidate>
+              <div class="fgrid">
+                <div class="field"><label for="qProv">Provider</label><select class="input" id="qProv"></select></div>
+                <div class="field"><label for="qBasis">Quoted as</label><select class="input" id="qBasis"></select></div>
+                <div class="field"><label for="qUnit">Per</label><select class="input" id="qUnit"><option value="1">1 unit</option><option value="100">100 units</option><option value="1000">1,000 units</option></select></div>
+                <div class="field"><label for="qVal">Quoted rate</label><input class="input" id="qVal" inputmode="decimal" autocomplete="off" placeholder="e.g. 25.65" aria-describedby="qErr"></div>
+                <div class="field"><label for="qFee">Provider fee (sending ccy)</label><input class="input" id="qFee" inputmode="decimal" value="0"></div>
+              </div>
+              <div class="err" id="qErr" role="alert"></div>
+              <div class="controls" style="margin-top:6px"><button type="button" class="btn primary" id="qSave">Use this quote for the provider</button><button type="button" class="btn" id="qClear">Clear</button></div>
+              <p class="hint">Tip: banks in Thailand and Malaysia often quote per 100 units, and some quote the inverse pair. The sanity band (−25 to +500 bps from mid) catches most mix-ups.</p>
+            </form>
+          </div>
+          <div class="qresult" id="qResult" aria-live="polite"><p class="hint">Enter a quote to see the result.</p></div>
+        </div>
+        <div class="panel"><h3>How to read the grade</h3>
+          <div class="tbl-wrap"><table><thead><tr><th>Grade</th><th>Margin vs mid</th><th>What it usually means</th></tr></thead><tbody>
+            <tr><td><span class="grade g1">Sharp</span></td><td>under 15 bps</td><td>Dealer or platform pricing. Hard to beat.</td></tr>
+            <tr><td><span class="grade g2">Fair</span></td><td>15 to 50 bps</td><td>Typical negotiated corporate rate.</td></tr>
+            <tr><td><span class="grade g3">High</span></td><td>50 to 150 bps</td><td>Board rate. Ask for a dealer quote (RFQ).</td></tr>
+            <tr><td><span class="grade g4">Very high</span></td><td>over 150 bps</td><td>Retail counter pricing, or a typing mistake.</td></tr>
+          </tbody></table></div>
+          <p class="hint">Bands are this tool's rule of thumb, not an industry standard. Adjust your expectations for exotic pairs and small tickets.</p>
+        </div>
+      </section>
 
-  <footer>
-    <p><strong>Illustrative only. Not financial, legal or tax advice. Rates are indicative mid-market rates and estimated customer rates, not dealing rates. The tool compares; it never moves money.</strong></p>
-    <p>Sources: Frankfurter (central-bank reference rates); Bank Negara Malaysia (data.gov.my, CC BY 4.0), served by Frankfurter; fawazahmed0/exchange-api (open data). Times are in your local time zone.</p>
-  </footer>
+      <!-- ===== 4. Checklist ===== -->
+      <section class="view" id="v-checklist" aria-labelledby="h-check" hidden>
+        <div class="view-head"><div><h2 id="h-check">4 · Before you call the bank</h2><p>Automatic checks for this scenario, then a call checklist you can tick off.</p></div></div>
+        <div class="grid-2">
+          <div><h3>Checks and edge cases</h3><div class="checks" id="checkList"></div></div>
+          <div class="panel"><div class="p-head"><h3>Call checklist</h3><button type="button" class="btn small" id="todoReset">Untick all</button></div>
+            <div class="progress" aria-hidden="true"><span id="todoBar" style="width:0"></span></div><p class="hint" id="todoTxt"></p>
+            <div class="todo" id="todo"></div></div>
+        </div>
+      </section>
+
+      <!-- ===== Full sheet ===== -->
+      <section class="view" id="v-sheet" aria-labelledby="h-sheet" hidden>
+        <div class="view-head"><div><h2 id="h-sheet">FX Comparison Calculation</h2><p id="sheetSub"></p></div>
+          <div class="controls no-print"><button type="button" class="btn" id="csvBtn">Export CSV</button><button type="button" class="btn primary" id="printBtn">Print / Save PDF</button></div></div>
+        <div class="panel"><p style="margin:0"><b>Objective:</b> <span id="sheetObj"></span></p></div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">1</span>Comparison scenarios</h3></div><div class="flows" id="sheetFlows"></div></div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">2</span>Market rates used</h3></div><div class="tbl-wrap"><table><thead><tr><th>Source</th><th class="num">Rate</th><th class="num">vs mid</th><th>As of</th><th>Status</th></tr></thead><tbody id="sheetMid"></tbody></table></div></div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">3</span>Provider rates</h3></div><div class="tbl-wrap"><table><thead><tr><th>Scenario</th><th>Provider</th><th class="num">Rate</th><th class="num">Margin</th><th>Basis</th></tr></thead><tbody id="sheetRates"></tbody></table></div></div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">4</span>Fees breakdown</h3><span class="hint">Edit any fee; every page updates. Fees are in the sending currency.</span></div>
+          <div class="tbl-wrap sheet"><table><thead><tr><th>Scenario</th><th>Step</th><th>Fee item</th><th class="num">Amount</th><th>Ccy</th><th>Remarks</th></tr></thead><tbody id="sheetFees"></tbody></table></div>
+          <div class="fgrid" style="margin-top:12px">
+            <div class="field"><label for="shCode">SWIFT charge code</label><select class="input" id="shCode"><option>OUR</option><option>SHA</option><option>BEN</option></select></div>
+            <div class="field"><label for="shDays">Days in transit</label><input class="input" id="shDays" inputmode="numeric"></div>
+          </div>
+          <p class="hint" id="shCodeHelp"></p>
+        </div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">5</span>Summary and result</h3></div><div class="grid-2"><div id="sheetBars"></div><div id="sheetSummary"></div></div></div>
+        <div class="panel"><div class="p-head"><h3><span class="stepno">6</span>Detailed result</h3></div><div class="tbl-wrap"><table><thead><tr><th>Rank</th><th>Route</th><th class="num">You pay</th><th class="num">They receive</th><th class="num">Effective rate</th><th class="num">Cost vs mid</th><th class="num">vs best</th><th class="num">Days</th></tr></thead><tbody id="sheetRes"></tbody></table></div></div>
+      </section>
+
+      <!-- ===== Markets ===== -->
+      <section class="view" id="v-markets" aria-labelledby="h-mk" hidden>
+        <div class="view-head"><div><h2 id="h-mk">Rates and history</h2><p>Consensus mid for the main pairs, plus the daily reference-rate history for your pair.</p></div></div>
+        <div class="panel"><div class="p-head"><h3 id="histTitle">History</h3>
+          <div class="seg" role="group" aria-label="History range" id="rangeSeg"><button type="button" data-days="30">1M</button><button type="button" data-days="91" >3M</button><button type="button" data-days="182" aria-pressed="true">6M</button><button type="button" data-days="365">1Y</button><button type="button" data-days="1826">5Y</button></div></div>
+          <div id="histChart"></div><div class="chart-tip" id="histTip" aria-live="off"></div><div class="statrow" id="histStats"></div>
+          <p class="hint">Daily central-bank reference rates from Frankfurter. Not intraday. Axis does not start at zero.</p>
+        </div>
+        <div class="panel"><h3>Market board</h3><div class="cards" id="cards2"></div></div>
+        <div class="panel"><h3>More currencies <small>vs MYR</small></h3><div class="tbl-wrap"><table><thead><tr><th>Currency</th><th class="num">MYR per unit</th><th class="num">Spread</th><th class="num">Sources</th></tr></thead><tbody id="moreBody"></tbody></table></div></div>
+      </section>
+
+      <!-- ===== Sources ===== -->
+      <section class="view" id="v-sources" aria-labelledby="h-src" hidden>
+        <div class="view-head"><div><h2 id="h-src">Sources and health <small id="srcPair"></small></h2><p>Only mid-market sources feed the consensus. Customer rates never do.</p></div></div>
+        <div class="panel"><h3>Market mid for this pair</h3><div class="tbl-wrap"><table><thead><tr><th>Source</th><th class="num">Rate</th><th class="num">vs mid</th><th>As of</th><th>Status</th></tr></thead><tbody id="midBody"></tbody></table></div>
+          <p class="hint">Consensus = median of fresh sources after dropping any more than 50 bps from the first median. Fresh = at most 2 business days old.</p></div>
+        <div class="panel"><h3>Source health</h3><div class="tbl-wrap"><table><thead><tr><th>Source</th><th>Type</th><th>Status</th><th class="num">Response</th><th>Newest data</th><th>Publishes</th></tr></thead><tbody id="healthBody"></tbody></table></div>
+          <details style="margin-top:10px"><summary>What "Live" means here</summary><p class="hint">Live means the sources answered on the last check. Most free sources publish daily, so numbers often stay the same between checks; Coinbase is the only intraday reference. Each source is called no more often than it updates, to respect the providers' terms. For dealing-grade intraday rates, add a paid feed or a bank API behind a small server.</p></details>
+        </div>
+      </section>
+
+      <!-- ===== Help ===== -->
+      <section class="view" id="v-help" aria-labelledby="h-help" hidden>
+        <div class="view-head"><div><h2 id="h-help">How it works</h2><p>The method, the words, and the shortcuts.</p></div></div>
+        <div class="grid-2">
+          <div class="panel method">
+            <details open><summary>Rate types</summary><p>A <b>mid</b> (central-bank reference or aggregator) is the fair market rate. A <b>board rate</b>, platform rate or dealer quote is what a customer actually gets. Only mids feed the consensus.</p></details>
+            <details><summary>Consensus mid</summary><pre>first  = median(fresh mids)
+used   = sources within 50 bps of first
+mid    = median(used)
+spread = largest |rate − mid| of a used source</pre></details>
+            <details><summary>Provider margin</summary><pre>margin_bps    = (mid − customer_rate) / mid × 10,000
+customer_rate = live_mid × (1 − margin_bps / 10,000)</pre><p>Margins move less than rates, so a stored margin is re-applied to today's mid.</p></details>
+            <details><summary>Routes</summary><p>A: convert in the sending country, then send. B: send the source currency to your own account abroad, convert there. C: convert a balance already held abroad. D: via USD (two conversions). P: FX platform with local payout. R: dealer quote at your sending bank.</p></details>
+            <details><summary>Fees and SWIFT codes</summary><pre>OUR: sender + intermediary on top; landing deducted
+SHA: sender on top; intermediary + landing deducted
+BEN: all deducted</pre></details>
+            <details><summary>Comparing fairly</summary><pre>effective_rate = net_received / total_paid
+cost_bps = (total_paid × mid − net_received) / (total_paid × mid) × 10,000</pre></details>
+            <details><summary>Transit risk</summary><pre>daily_vol = annual_vol / √252
+band = net × daily_vol × √(days unconverted)
+P(edge lost) = Φ(−edge / band)</pre><p>Assumes normal daily moves. Real FX has fat tails and event risk.</p></details>
+            <details><summary>What this tool does not do</summary><p>It compares and explains. It never moves money, does not guarantee a rate, and never suggests splitting a payment to stay under a threshold.</p></details>
+          </div>
+          <div>
+            <div class="panel"><h3>Glossary</h3><dl class="gloss">
+              <dt>bps</dt><dd>Basis point = 0.01%. 50 bps on 1,000,000 = 5,000.</dd>
+              <dt>Mid</dt><dd>Halfway between buy and sell in the wholesale market.</dd>
+              <dt>TT</dt><dd>Telegraphic transfer: a SWIFT payment.</dd>
+              <dt>RFQ</dt><dd>Request for quote from a bank's dealing desk.</dd>
+              <dt>BIC</dt><dd>SWIFT code identifying a bank (8 or 11 characters).</dd>
+              <dt>Value date</dt><dd>The day the money actually settles.</dd>
+            </dl></div>
+            <div class="panel"><h3>Keyboard shortcuts</h3><dl class="gloss">
+              <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Journey steps</dd>
+              <dt><kbd>0</kbd></dt><dd>Overview</dd>
+              <dt><kbd>S</kbd></dt><dd>Full sheet</dd>
+              <dt><kbd>/</kbd></dt><dd>Jump to amount</dd>
+              <dt><kbd>R</kbd></dt><dd>Refresh rates</dd>
+              <dt><kbd>X</kbd></dt><dd>Swap currencies</dd>
+              <dt><kbd>?</kbd></dt><dd>Start the guide</dd>
+              <dt><kbd>Esc</kbd></dt><dd>Close guide or menu</dd>
+            </dl></div>
+            <div class="panel"><h3>Self-check</h3><p id="scSummary" class="hint"></p></div>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <p><strong>Illustrative only. Not financial, legal or tax advice.</strong> Mid rates are indicative reference rates; provider rates are estimates unless you typed a quote. The tool compares; it never moves money.</p>
+        <p>Data: <a href="https://frankfurter.dev" rel="noopener">Frankfurter</a> (central-bank reference rates, incl. Bank Negara Malaysia) · <a href="https://github.com/fawazahmed0/exchange-api" rel="noopener">fawazahmed0/exchange-api</a> · <a href="https://www.exchangerate-api.com" rel="noopener">Rates By Exchange Rate API</a> · <a href="https://www.floatrates.com" rel="noopener">FloatRates</a> · <a href="https://www.coinbase.com" rel="noopener">Coinbase</a>. Times in your local time zone.</p>
+      </footer>
+    </main>
+  </div>
 </div>
 
+<div class="guide-ring" id="guideRing" hidden></div>
+<div class="guide" id="guide" role="dialog" aria-modal="false" aria-labelledby="guideH" hidden>
+  <h4 id="guideH"></h4><p id="guideP"></p>
+  <div class="gfoot"><span class="hint" id="guideN"></span><span class="controls"><button type="button" class="btn small" id="guideSkip">Skip</button><button type="button" class="btn small" id="guidePrev">Back</button><button type="button" class="btn small primary" id="guideNext">Next</button></span></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script src="fx-core.js"></script>
-<script>
-(function () {
-  "use strict";
-  var FX = window.FX, root = document.getElementById("fxapp");
-  var $ = function (id) { return root.querySelector("#" + id); };
-  var esc = FX.esc;
-  var REFRESH_MS = 60000;
-  var PAIRS = [
-    { b: "USD", q: "MYR" }, { b: "SGD", q: "MYR" }, { b: "THB", q: "MYR", unit: 100 },
-    { b: "USD", q: "SGD" }, { b: "USD", q: "THB" }, { b: "SGD", q: "THB" }
-  ];
-  var CODE_HELP = {
-    OUR: "<b>OUR</b>: you pay all transfer fees on top. The beneficiary receives the full amount. Use this for supplier invoices.",
-    SHA: "<b>SHA</b>: you pay your bank's fee; intermediary and receiving bank fees are deducted on the way. The beneficiary receives slightly less.",
-    BEN: "<b>BEN</b>: all fees are deducted from the amount sent. You pay nothing extra; the beneficiary receives the least."
-  };
-
-  var S = FX.loadSettings();
-  var state = { perUsd: {}, health: {}, lastCheck: null, lastGood: null, nextAt: null, paused: false, busy: false,
-    cachedAt: null, history: {}, selected: null, model: null };
-  var timer = null;
-
-  // Load cached snapshot so the page works offline.
-  var snap = FX.loadSnapshot();
-  if (snap) { state.perUsd = snap.perUsd; state.cachedAt = snap.at; state.health = snap.health || {}; }
-
-  /* ---------- Scenario inputs ---------- */
-  function fillSelects() {
-    var opts = FX.ROUTE_CCYS.map(function (c) { return '<option value="' + c + '">' + c + "</option>"; }).join("");
-    $("fromCcy").innerHTML = opts; $("toCcy").innerHTML = opts;
-  }
-  function syncInputs() {
-    var sc = S.scenario;
-    $("fromCcy").value = sc.from; $("toCcy").value = sc.to;
-    if (document.activeElement !== $("amt")) $("amt").value = FX.fmtMoney(+sc.amount, sc.amount % 1 ? 2 : 0);
-    $("holdAbroad").checked = !!sc.holdAbroad;
-    var dc = FX.COUNTRY_NAME[FX.COUNTRY_OF[sc.to]] || sc.to;
-    $("holdLabel").textContent = "We already hold " + sc.from + " in " + dc;
-    root.querySelectorAll("#codeSeg button").forEach(function (b) { b.setAttribute("aria-pressed", String(b.getAttribute("data-code") === S.fees.code)); });
-  }
-  function persist() { FX.saveSettings(S); }
-
-  /* ---------- Model ---------- */
-  function computeModel() {
-    var now = new Date(), sc = S.scenario;
-    var mid = FX.makeMid(state.perUsd, S, now);
-    var m = { now: now, mid: mid, src: sc.from, tgt: sc.to, amount: +sc.amount, ok: true };
-    if (sc.from === sc.to) { m.ok = false; m.msg = "Pick two different currencies."; return m; }
-    if (!(m.amount > 0)) { m.ok = false; m.msg = "Enter an amount."; return m; }
-    m.midInfo = mid.info(sc.from, sc.to);
-    m.routes = FX.buildRoutes(S, mid);
-    m.results = m.routes.map(function (r) { return FX.evaluate(r, m.amount, sc.from, sc.to, mid); });
-    m.cmp = FX.compare(m.results, m.amount, sc.from, sc.to, mid, +S.risk.annualVolPct || 0);
-    m.available = m.results.filter(function (r) { return r.ok; });
-    m.unavailable = m.results.filter(function (r) { return !r.ok; });
-    if (!state.selected || !m.available.some(function (r) { return r.route.id === state.selected; })) {
-      state.selected = m.cmp.best ? m.cmp.best.route.id : null;
-    }
-    return m;
-  }
-
-  /* ---------- Rendering helpers ---------- */
-  function money(ccy, v, dp) { return ccy + " " + FX.fmtMoney(v, dp == null ? 2 : dp); }
-  function midHow(info) {
-    if (info.how === "live" && !state.lastGood && state.cachedAt) return "saved rates from " + FX.hhmm(state.cachedAt) + " " + FX.dayMon(state.cachedAt);
-    return info.how === "live" ? "live consensus" : info.how === "stale" ? "older source rates (stale)" : info.how === "fallback" ? "illustrative fallback" : "";
-  }
-  function legsHtml(r, amount) {
-    var src = r.route.legs.length ? (r.route.legs[0].t === "convert" ? r.route.legs[0].from : r.route.legs[0].ccy) : "";
-    var h = ['<span class="leg ccy">' + esc(src) + " " + FX.fmtMoney(amount, 0) + "</span>"];
-    r.route.legs.forEach(function (L) {
-      h.push('<span class="arrow" aria-hidden="true">→</span>');
-      if (L.t === "convert") {
-        h.push('<span class="leg">Convert at ' + esc(L.provider) + " · " + FX.fmtRate(L.rate) + "</span>");
-        h.push('<span class="arrow" aria-hidden="true">→</span><span class="leg ccy">' + esc(L.to) + "</span>");
-      } else {
-        h.push('<span class="leg tt">TT ' + esc(L.ccy) + " · " + esc(L.code) + " · " + L.days + " day" + (L.days === 1 ? "" : "s") + "</span>");
-      }
-    });
-    return h.join(" ");
-  }
-
-  /* ---------- Summary ---------- */
-  function renderSummary(m) {
-    var v = $("verdict");
-    if (!m.ok) { v.className = "verdict bad"; v.innerHTML = '<div class="headline">' + esc(m.msg) + "</div>"; $("stats").innerHTML = ""; $("story").innerHTML = ""; return; }
-    var c = m.cmp, best = c.best, tgt = m.tgt, src = m.src;
-    if (!best) {
-      v.className = "verdict bad";
-      v.innerHTML = '<div class="eyebrow">No result</div><div class="headline">No route could be priced for ' + src + " to " + tgt + ".</div><p>Enable at least one provider on the Rates &amp; assumptions page, or check typed quotes that failed the sanity check.</p>";
-      $("stats").innerHTML = ""; $("story").innerHTML = ""; return;
-    }
-    v.className = "verdict";
-    var html = '<div class="eyebrow">Recommended option</div>';
-    html += '<div class="headline">' + esc(best.route.title) + "</div>";
-    var p = "You receive <b>" + money(tgt, best.net) + "</b> for " + money(src, best.sourceSpent) + " paid";
-    if (c.runner) p += ", which is <b>" + money(tgt, c.edgeVsRunner) + "</b> (" + FX.fmtBps(c.edgeVsRunnerBps) + ") more than the next best option, " + esc(c.runner.route.short);
-    if (c.baseline && c.baseline !== best && c.baseline !== c.runner) p += ", and " + money(tgt, best.edgeVsBaseline) + " more than " + esc(c.baseline.route.short);
-    html += "<p>" + p + ".</p>";
-    var cautions = [];
-    if (c.withinNoise) cautions.push("Close call: a normal one-day market move (about " + money(tgt, c.band, 0) + ") is larger than this advantage. Lock the rate, or prefer the route that converts first.");
-    else if (c.lossProb != null && c.lossProb >= 0.05) cautions.push("About " + (c.lossProb * 100).toFixed(1) + "% chance that market moves while the money is in transit erase this advantage.");
-    if (best.route.legs.some(function (L) { return L.t === "convert" && L.how === "markup"; })) cautions.push("This uses an estimated margin on today's mid, not a confirmed quote. Ask the provider for a firm rate before deciding.");
-    if (m.midInfo.how !== "live") cautions.push("The market mid is from " + midHow(m.midInfo) + ", so amounts are less reliable.");
-    cautions.forEach(function (t) { html += '<div class="caution">' + esc(t) + "</div>"; });
-    v.innerHTML = html;
-
-    $("stats").innerHTML =
-      '<div class="stat hl"><div class="k">They receive (best)</div><div class="v">' + money(tgt, best.net) + '</div><div class="s">net of all fees</div></div>' +
-      '<div class="stat"><div class="k">Advantage vs next best</div><div class="v">' + (c.runner ? FX.fmtSigned(c.edgeVsRunner) + " " + tgt : "—") + '</div><div class="s">' + (c.runner ? FX.fmtBps(c.edgeVsRunnerBps) : "only one route") + "</div></div>" +
-      '<div class="stat"><div class="k">Total cost vs mid</div><div class="v">' + FX.fmtBps(best.costBps) + '</div><div class="s">' + money(tgt, best.totalCost) + " lost to margin and fees</div></div>" +
-      '<div class="stat"><div class="k">Effective rate</div><div class="v">' + FX.fmtRate(best.effRate) + '</div><div class="s">' + tgt + " per 1 " + src + " · mid " + FX.fmtRate(m.midInfo.mid) + "</div></div>";
-
-    var av = m.available, worst = c.sorted[c.sorted.length - 1];
-    var minC = Math.min.apply(null, av.map(function (r) { return r.costBps; })), maxC = Math.max.apply(null, av.map(function (r) { return r.costBps; }));
-    $("story").innerHTML =
-      '<div class="step"><span class="n">1</span><span class="t">The market rate</span><p>1 ' + src + " = " + FX.fmtRate(m.midInfo.mid) + " " + tgt + " (" + midHow(m.midInfo) + "). This is the fair rate nobody actually gives you.</p></div>" +
-      '<div class="step"><span class="n">2</span><span class="t">What providers keep</span><p>All-in cost ranges from ' + FX.fmtBps(minC) + " to " + FX.fmtBps(maxC) + " across " + av.length + " routes, mostly through the FX margin rather than fees.</p></div>" +
-      '<div class="step"><span class="n">3</span><span class="t">What you keep</span><p>Choosing the best route over the worst (' + esc(worst.route.short) + ") keeps an extra <b>" + money(tgt, best.netPerAmount - worst.netPerAmount, 0) + "</b>.</p></div>";
-  }
-
-  /* ---------- Routes ---------- */
-  function renderRoutes(m) {
-    if (!m.ok) { $("routeList").innerHTML = ""; $("naList").innerHTML = ""; $("naTitle").hidden = true; return; }
-    var c = m.cmp, tgt = m.tgt;
-    var maxCost = Math.max.apply(null, m.available.map(function (r) { return r.costBps; }).concat([1]));
-    $("routeList").innerHTML = c.sorted.map(function (r) {
-      var isBest = r === c.best, sel = r.route.id === state.selected;
-      var notes = (r.route.notes || []).map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("");
-      return '<article class="route ' + (isBest ? "best" : "dim") + (sel ? " sel" : "") + '" data-id="' + esc(r.route.id) + '">' +
-        '<div class="r-head"><div><span class="r-rank">' + r.rank + '</span><span class="r-title">' + esc(r.route.title) + "</span></div>" +
-        (isBest ? '<span class="tag good">Best option</span>' : '<span class="tag plain">' + FX.fmtSigned(r.edgeVsBest, 0) + " " + tgt + " vs best</span>") + "</div>" +
-        '<div class="legs">' + legsHtml(r, m.amount) + "</div>" +
-        '<div class="r-metrics">' +
-          '<div><div class="k">They receive</div><div class="v">' + money(tgt, r.net) + "</div></div>" +
-          '<div><div class="k">Effective rate</div><div class="v">' + FX.fmtRate(r.effRate) + "</div></div>" +
-          '<div><div class="k">Cost vs mid</div><div class="v">' + FX.fmtBps(r.costBps) + "</div></div>" +
-          '<div><div class="k">Arrives in</div><div class="v">' + (r.totalDays ? r.totalDays + " business day" + (r.totalDays === 1 ? "" : "s") : "same day") + "</div></div>" +
-        "</div>" +
-        '<div class="costbar" aria-hidden="true"><span style="width:' + Math.max(2, r.costBps / maxCost * 100).toFixed(1) + '%"></span></div>' +
-        (notes ? '<ul class="r-notes">' + notes + "</ul>" : "") +
-        '<div class="r-actions"><button type="button" class="btn small" data-sel="' + esc(r.route.id) + '" aria-pressed="' + sel + '">' + (sel ? "Showing breakdown" : "Show fees breakdown") + "</button></div>" +
-        "</article>";
-    }).join("");
-    $("naTitle").hidden = !m.unavailable.length;
-    $("naList").innerHTML = m.unavailable.map(function (r) {
-      return '<article class="route na"><div class="r-head"><span class="r-title">' + esc(r.route.title) + '</span><span class="tag warn">Not available</span></div><p class="hint" style="margin:6px 0 0">' + esc(r.err) + "</p></article>";
-    }).join("");
-  }
-
-  /* ---------- Breakdown ---------- */
-  function renderBreakdown(m) {
-    var r = m.ok && m.available.filter(function (x) { return x.route.id === state.selected; })[0];
-    if (!r) { $("bdRoute").textContent = ""; $("bdBody").innerHTML = '<tr><td>No route selected.</td></tr>'; $("codeBody").innerHTML = ""; $("bicList").textContent = ""; $("split").innerHTML = ""; $("splitText").textContent = ""; $("codeHelp").innerHTML = CODE_HELP[S.fees.code]; return; }
-    var src = m.src, tgt = m.tgt, mid = m.mid;
-    $("bdRoute").textContent = r.route.title;
-    var rows = [];
-    function row(k, v, cls) { rows.push('<tr class="' + (cls || "") + '"><td>' + k + '</td><td class="num">' + v + "</td></tr>"); }
-    row("Amount you send", money(src, m.amount));
-    r.feeLines.filter(function (f) { return f.how === "on top"; }).forEach(function (f) { row("+ " + esc(f.label) + " (paid on top)", money(src, f.src), "sub"); });
-    row("Total you pay", money(src, r.sourceSpent), "total");
-    r.feeLines.filter(function (f) { return f.how === "deducted"; }).forEach(function (f) { row("− " + esc(f.label) + " (deducted in flight)", money(src, f.src), "sub"); });
-    r.route.legs.filter(function (L) { return L.t === "convert"; }).forEach(function (L) {
-      var md = mid(L.from, L.to);
-      row("Rate: " + esc(L.provider) + " (" + (L.how === "quote" ? "your typed quote" : "mid − " + (+L.markupBps).toFixed(2) + " bps") + ")",
-        "1 " + L.from + " = " + FX.fmtRate(L.rate) + " " + L.to + '<div class="src-sub">mid ' + FX.fmtRate(md) + "</div>");
-    });
-    row("FX margin cost", money(tgt, r.fxMargin));
-    row("Fees cost (valued at mid)", money(tgt, r.fees));
-    row("Total cost vs mid", money(tgt, r.totalCost) + '<div class="src-sub">' + FX.fmtBps(r.costBps) + "</div>", "total");
-    row("They receive", money(tgt, r.net), "net");
-    row("Effective rate", FX.fmtRate(r.effRate) + " " + tgt + " per " + src);
-    row("Time in transit, unconverted", r.exposureDays ? r.exposureDays + " day(s) · 1-sigma move ≈ " + money(tgt, r.band, 0) : "None (converts before sending)");
-    $("bdBody").innerHTML = rows.join("");
-
-    var tot = Math.max(r.totalCost, 1e-9), mPct = Math.max(0, Math.min(100, r.fxMargin / tot * 100));
-    $("split").innerHTML = '<span class="m" style="width:' + mPct.toFixed(1) + '%"></span><span class="f" style="width:' + (100 - mPct).toFixed(1) + '%"></span>';
-    $("splitText").textContent = "FX margin is " + mPct.toFixed(0) + "% of the cost on this route. " + (mPct > 80 ? "Negotiating the rate matters far more than the transfer fees." : "Fees are a meaningful part of the cost at this amount.");
-
-    // SWIFT code comparison
-    $("codeHelp").innerHTML = CODE_HELP[S.fees.code];
-    var hasTT = r.route.legs.some(function (L) { return L.t === "transfer"; });
-    if (!hasTT) { $("codeBody").innerHTML = '<tr><td colspan="4">This route has no SWIFT transfer, so the charge code does not apply.</td></tr>'; }
-    else {
-      $("codeBody").innerHTML = ["OUR", "SHA", "BEN"].map(function (code) {
-        var s2 = FX.clone(S); s2.fees.code = code;
-        var rt = FX.buildRoutes(s2, mid).filter(function (x) { return x.id === r.route.id; })[0];
-        var e = rt && FX.evaluate(rt, m.amount, src, tgt, mid);
-        if (!e || !e.ok) return "";
-        return '<tr class="' + (code === S.fees.code ? "bestrow" : "") + '"><td><b>' + code + '</b></td><td class="num">' + money(src, e.sourceSpent) + '</td><td class="num">' + money(tgt, e.net) + '</td><td class="num">' + money(tgt, e.totalCost, 0) + "</td></tr>";
-      }).join("");
-    }
-    var seen = {};
-    var bics = r.route.legs.filter(function (L) { return L.t === "convert"; }).map(function (L) {
-      var p = S.providers.filter(function (x) { return x.name === L.provider; })[0];
-      if (!p || seen[p.id]) return ""; seen[p.id] = 1;
-      return "<div><b>" + esc(p.name) + ":</b> " + (p.bic ? '<span class="tag">' + esc(p.bic) + "</span> verify with the bank before use" : 'not set. <a href="fx-inputs.html#providers">Add it</a>') + "</div>";
-    }).join("");
-    $("bicList").innerHTML = (bics || "No bank on this route.") + '<p class="hint">You also need the beneficiary bank\'s BIC and account details for the payment instruction.</p>';
-  }
-
-  /* ---------- Checks ---------- */
-  function renderChecks(m) {
-    var L = [];
-    function add(level, title, text) { L.push({ level: level, title: title, text: text }); }
-    if (!m.ok || !m.cmp.best) { $("checkList").innerHTML = ""; return; }
-    var c = m.cmp, best = c.best, now = m.now, src = m.src, tgt = m.tgt;
-    if (m.midInfo.how === "fallback") add("bad", "Using illustrative fallback rates", "No source rates are available. Edit the fallback mids on the Rates & assumptions page, or fix the connection (see Source health).");
-    else if (m.midInfo.how === "stale") add("warn", "Market rates are old", "Sources are more than 2 business days old. Amounts are indicative only.");
-    else if (state.cachedAt && !state.lastGood) add("warn", "Showing saved rates", "Saved from " + FX.hhmm(state.cachedAt) + " " + FX.dayMon(state.cachedAt) + ". The live check has not succeeded yet.");
-    var usd = m.amount * m.mid(src, "USD");
-    var boardBest = best.route.legs.some(function (x) { return x.t === "convert" && x.kind === "board"; });
-    if (usd >= (+S.risk.rfqThresholdUsd || Infinity) && boardBest) add("info", "Ask for a dealer quote (RFQ)", "About USD " + FX.fmtMoney(usd, 0) + " is above your RFQ threshold. Banks usually beat their board rate for tickets this size.");
-    if (c.withinNoise) add("warn", "The winning margin is within normal market noise", "A one-day move of about " + tgt + " " + FX.fmtMoney(c.band, 0) + " could flip the result. Converting before sending removes this risk.");
-    if (best.exposureDays) add("info", "Money is unconverted while in transit", best.exposureDays + " business day(s) of exposure to " + src + "/" + tgt + " moves.");
-    if (S.fees.code !== "OUR" && best.route.legs.some(function (x) { return x.t === "transfer"; })) add("warn", "Paying a supplier invoice?", "With " + S.fees.code + ", the beneficiary receives less than the invoice amount. Use OUR, or the invoice may be short-paid.");
-    var day = now.getDay(), hm = FX.hhmm(now), cutoff = String(S.risk.cutoff || "15:00");
-    if (day === 0 || day === 6) add("warn", "Weekend", "Transfers instructed now start on the next business day. The rate you see may change by then.");
-    else if (hm > cutoff) add("warn", "Past the " + cutoff + " cut-off", "TT instructions after the cut-off are usually value-dated the next business day" + (day === 5 ? ", which is Monday" : "") + ". Cut-off times vary by bank and currency.");
-    add("info", "Public holidays are not modelled", "A holiday in either country adds at least a day to every route with a transfer.");
-    add("info", "Supporting documents", "Large cross-border payments usually need a stated purpose and supporting documents. Never split a payment to stay under a reporting or review threshold.");
-    (best.route.notes || []).forEach(function (n) { add("info", "About the recommended route", n); });
-    m.unavailable.filter(function (r) { return /sanity band/.test(r.err || ""); }).forEach(function (r) { add("bad", "Typed quote rejected: " + r.route.title, r.err); });
-    var icon = { info: "i", warn: "!", bad: "×", good: "✓" };
-    $("checkList").innerHTML = L.map(function (x) {
-      return '<div class="check ' + x.level + '"><span class="ic" aria-hidden="true">' + icon[x.level] + "</span><div><b>" + esc(x.title) + "</b><span>" + esc(x.text) + "</span></div></div>";
-    }).join("");
-  }
-
-  /* ---------- Sources ---------- */
-  function renderSources(m) {
-    if (!m.ok) { $("midBody").innerHTML = ""; $("provBody").innerHTML = ""; return; }
-    var src = m.src, tgt = m.tgt;
-    $("srcPair").textContent = src + "/" + tgt;
-    var c = FX.consensus(state.perUsd, src, tgt, m.now, true);
-    var rows = c.rows.map(function (r) {
-      var s = FX.SOURCES.filter(function (x) { return x.id === r.src; })[0];
-      var st = r.used ? '<span class="tag good">used</span>' : r.rejected ? '<span class="tag bad">outlier</span>' : '<span class="tag warn">stale</span>';
-      return '<tr class="' + (r.used ? "" : "dim") + '"><td><div class="src-name">' + esc(s.label) + '</div><div class="src-sub">' + esc(FX.TYPE_LABEL[s.type]) + (r.cross ? " · " + r.cross : "") + '</div></td><td class="num">' + FX.fmtRate(r.rate) + '</td><td class="num">' + (isFinite(r.dev) ? (Math.abs(r.dev) < 0.05 ? "0.0" : (r.dev > 0 ? "+" : "") + r.dev.toFixed(1)) + " bps" : "—") + "</td><td>" + FX.dayMonUTC(r.date) + "</td><td>" + st + "</td></tr>";
-    });
-    rows.push('<tr class="bestrow"><td><div class="src-name">Mid used</div><div class="src-sub">' + midHow(m.midInfo) + '</div></td><td class="num"><b>' + FX.fmtRate(m.midInfo.mid) + '</b></td><td class="num">' + (isFinite(c.disp) ? "spread " + c.disp.toFixed(1) + " bps" : "") + "</td><td></td><td></td></tr>");
-    $("midBody").innerHTML = rows.join("");
-
-    var oc = FX.COUNTRY_OF[src], dc = FX.COUNTRY_OF[tgt];
-    var list = S.providers.filter(function (p) { return p.enabled && [oc, dc, "ANY", "ORIGIN"].indexOf(p.country) >= 0; }).map(function (p) {
-      return { p: p, pr: FX.providerRate(p, src, tgt, m.mid) };
-    });
-    var bestRate = Math.max.apply(null, list.filter(function (x) { return x.pr.ok; }).map(function (x) { return x.pr.rate; }).concat([-Infinity]));
-    $("provBody").innerHTML = list.map(function (x) {
-      var where = x.p.country === "ANY" ? "Platform" : x.p.country === "ORIGIN" ? "Dealer desk" : FX.COUNTRY_NAME[x.p.country];
-      var isBest = x.pr.ok && x.pr.rate === bestRate;
-      return '<tr class="' + (isBest ? "bestrow" : x.pr.ok ? "" : "dim") + '"><td><div class="src-name">' + esc(x.p.name) + '</div><div class="src-sub">' + esc(where) + " · " + esc(FX.KIND_LABEL[x.p.kind] || x.p.kind) + '</div></td><td class="num">' + FX.fmtRate(x.pr.rate) + '</td><td class="num">' + (isFinite(x.pr.markupBps) ? x.pr.markupBps.toFixed(1) + " bps" : "—") + "</td><td>" + (x.pr.ok ? (x.pr.how === "quote" ? '<span class="tag">your quote</span>' : '<span class="tag plain">mid − margin</span>') : '<span class="tag bad">rejected</span>') + "</td></tr>";
-    }).join("") || '<tr><td colspan="4">No enabled provider for this pair.</td></tr>';
-  }
-
-  /* ---------- Market board ---------- */
-  function spark(k) {
-    var h = state.history[k] || [];
-    if (h.length < 2) return '<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"></svg>';
-    var lo = Math.min.apply(null, h), hi = Math.max.apply(null, h), rng = hi - lo || 1;
-    var d = h.map(function (v, i) { return (i ? "L" : "M") + (i / (h.length - 1) * 100).toFixed(2) + " " + (hi === lo ? 15 : 28 - (v - lo) / rng * 26).toFixed(2); }).join(" ");
-    return '<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path vector-effect="non-scaling-stroke" d="' + d + '"/></svg>';
-  }
-  function renderBoard(m) {
-    var now = m.now, prev = {};
-    root.querySelectorAll("[data-mid]").forEach(function (el) { prev[el.getAttribute("data-mid")] = el.textContent; });
-    $("cards").innerHTML = PAIRS.map(function (p) {
-      var k = p.b + "/" + p.q, c = FX.consensus(state.perUsd, p.b, p.q, now, true), u = p.unit || 1, h = state.history[k] || [];
-      var chg = h.length > 1 ? FX.bps(h[h.length - 1], h[h.length - 2]) : NaN;
-      var chgTxt = !isFinite(chg) ? "no change yet" : Math.abs(chg) < 0.005 ? "unchanged" : '<span class="' + (chg > 0 ? "up" : "down") + '">' + (chg > 0 ? "▲ " : "▼ ") + Math.abs(chg).toFixed(2) + " bps</span>";
-      var pressed = (m.src === p.b && m.tgt === p.q) || (m.src === p.q && m.tgt === p.b);
-      return '<button type="button" class="card" data-pair="' + k + '" aria-pressed="' + pressed + '"><div class="pair"><b>' + p.b + " / " + p.q + '</b><span class="unit">' + p.q + " per " + u + " " + p.b + '</span></div><div class="mid" data-mid="' + k + '">' + (isFinite(c.mid) ? FX.fmtRate(c.mid * u) : "—") + '</div><div class="meta"><span>' + chgTxt + "</span><span>" + c.used + "/" + FX.SOURCES.length + " sources" + (c.staleUsed ? " · stale" : "") + "</span></div>" + spark(k) + "</button>";
-    }).join("");
-    root.querySelectorAll("[data-mid]").forEach(function (el) { var k = el.getAttribute("data-mid"); if (prev[k] && prev[k] !== "—" && prev[k] !== el.textContent) el.classList.add("flash"); });
-    var UNIT = { JPY: 100, IDR: 100 };
-    $("moreBody").innerHTML = FX.EXTRA.map(function (cc) {
-      var c = FX.consensus(state.perUsd, cc, "MYR", now, true), u = UNIT[cc] || 1;
-      return "<tr><td><b>" + cc + "</b>" + (u > 1 ? ' <span class="src-sub">per ' + u + "</span>" : "") + '</td><td class="num">' + (isFinite(c.mid) ? FX.fmtRate(c.mid * u) : "—") + '</td><td class="num">' + (isFinite(c.disp) ? c.disp.toFixed(1) + " bps" : "—") + '</td><td class="num">' + c.used + "/" + FX.SOURCES.length + "</td></tr>";
-    }).join("");
-    $("healthBody").innerHTML = FX.SOURCES.map(function (s) {
-      var h = state.health[s.id];
-      var st = !h ? '<span class="tag plain">not checked</span>' : h.ok ? (h.partial && h.partial.length ? '<span class="tag warn">up, missing ' + esc(h.partial.join(", ")) + "</span>" : '<span class="tag good">up</span>') : '<span class="tag bad">down: ' + esc(h.err) + "</span>";
-      return '<tr><td><div class="src-name">' + esc(s.label) + '</div><div class="src-sub">' + esc(s.cadence) + "</div></td><td>" + st + '</td><td class="num">' + (h ? h.ms + " ms" : "—") + "</td><td>" + (h && h.newest ? FX.dayMonUTC(new Date(h.newest)) : "—") + "</td></tr>";
-    }).join("");
-  }
-
-  /* ---------- Status ---------- */
-  function upCount() { return FX.SOURCES.filter(function (s) { return state.health[s.id] && state.health[s.id].ok; }).length; }
-  function nextText() {
-    if (state.busy) return "checking now";
-    if (state.paused) return "paused";
-    if (document.hidden || !state.nextAt) return "resumes when tab is visible";
-    var s = Math.max(0, Math.ceil((state.nextAt - Date.now()) / 1000));
-    if (s >= 60) { var mm = Math.round(s / 60); return "next in " + mm + " min" + (mm > 1 ? "s" : ""); }
-    return "next in " + s + " s";
-  }
-  function renderStatus() {
-    var dot = $("statusDot"), txt = $("statusText");
-    if (!state.lastCheck) { dot.className = "dot"; txt.innerHTML = "<strong>Checking…</strong>"; return; }
-    var up = upCount(), all = FX.SOURCES.length;
-    var lvl = up === all ? "live" : up > 0 ? "warn" : "bad";
-    var label = state.paused ? "Paused" : lvl === "live" ? "Live" : lvl === "warn" ? "Partial" : (state.cachedAt ? "Offline, saved rates" : "Offline");
-    dot.className = "dot" + (state.paused ? "" : lvl === "live" ? " live" : lvl === "warn" ? " warn" : " bad");
-    txt.innerHTML = "<strong>" + label + "</strong> - checked " + FX.hhmm(state.lastCheck) + " " + FX.dayMon(state.lastCheck) + " - " + esc(nextText());
-  }
-  function renderBanner() {
-    var b = $("banner"), up = upCount();
-    if (!state.lastCheck) { b.className = "banner"; return; }
-    if (up === 0) {
-      b.className = "banner show bad";
-      b.textContent = "No rate source answered. " + (state.cachedAt ? "Using rates saved at " + FX.hhmm(state.cachedAt) + " " + FX.dayMon(state.cachedAt) + ". " : "Using illustrative fallback rates. ") + "If this keeps happening, the network may block the sources: see Source health, or run the page from your FastAPI app.";
-    } else if (up < FX.SOURCES.length) {
-      b.className = "banner show warn";
-      b.textContent = FX.SOURCES.filter(function (s) { return !(state.health[s.id] && state.health[s.id].ok); }).map(function (s) { return s.label; }).join(", ") + " did not answer. Mids use the remaining sources.";
-    } else b.className = "banner";
-  }
-
-  function renderAll() {
-    syncInputs();
-    var m = computeModel();
-    state.model = m;
-    $("amtErr").textContent = m.ok ? "" : m.msg;
-    $("midline").innerHTML = m.ok ? "Market mid: <b>1 " + m.src + " = " + FX.fmtRate(m.midInfo.mid) + " " + m.tgt + "</b> · " + midHow(m.midInfo) + (m.midInfo.used ? " · " + m.midInfo.used + " source(s), spread " + FX.fmtBps(m.midInfo.disp) : "") : "";
-    renderSummary(m); renderRoutes(m); renderBreakdown(m); renderChecks(m); renderSources(m); renderBoard(m); renderStatus(); renderBanner();
-  }
-
-  /* ---------- Refresh cycle ---------- */
-  function check() {
-    if (state.busy) return;
-    state.busy = true; clearTimeout(timer);
-    $("refreshBtn").disabled = true; $("refreshBtn").textContent = "Checking…";
-    renderStatus();
-    FX.fetchAll().then(function (res) {
-      var now = new Date();
-      state.health = res.health; state.lastCheck = now;
-      if (Object.keys(res.perUsd).length) {
-        Object.keys(res.perUsd).forEach(function (k) { state.perUsd[k] = res.perUsd[k]; });
-        state.lastGood = now; state.cachedAt = now;
-        FX.saveSnapshot(state.perUsd, state.health, now);
-      }
-      PAIRS.forEach(function (p) {
-        var k = p.b + "/" + p.q, c = FX.consensus(state.perUsd, p.b, p.q, now, true), h = state.history[k] || (state.history[k] = []);
-        if (isFinite(c.mid)) { h.push(c.mid); if (h.length > 180) h.shift(); }
-      });
-      state.busy = false;
-      $("refreshBtn").disabled = false; $("refreshBtn").textContent = "Refresh now";
-      renderAll();
-      var up = upCount();
-      $("announce").textContent = (up === FX.SOURCES.length ? "Rates checked, all sources up." : up ? "Rates checked, some sources down." : "Rate check failed.") + " " + FX.hhmm(now);
-      schedule();
-    });
-  }
-  function schedule() {
-    clearTimeout(timer);
-    if (state.paused || document.hidden) { state.nextAt = null; renderStatus(); return; }
-    state.nextAt = Date.now() + REFRESH_MS;
-    timer = setTimeout(check, REFRESH_MS);
-    renderStatus();
-  }
-
-  /* ---------- Events ---------- */
-  $("refreshBtn").addEventListener("click", check);
-  $("pauseBtn").addEventListener("click", function () {
-    state.paused = !state.paused;
-    this.setAttribute("aria-pressed", String(state.paused));
-    this.textContent = state.paused ? "Resume" : "Pause";
-    if (state.paused) { clearTimeout(timer); state.nextAt = null; renderStatus(); } else check();
-  });
-  $("scnForm").addEventListener("submit", function (e) { e.preventDefault(); });
-  $("amt").addEventListener("input", function () {
-    var p = FX.parseAmount(this.value);
-    this.setAttribute("aria-invalid", String(!p.ok));
-    if (!p.ok) { $("amtErr").textContent = p.msg; return; }
-    S.scenario.amount = p.value; persist(); renderAll();
-  });
-  $("amt").addEventListener("blur", function () {
-    var p = FX.parseAmount(this.value);
-    if (p.ok) this.value = FX.fmtMoney(p.value, p.value % 1 ? 2 : 0);
-  });
-  $("fromCcy").addEventListener("change", function () { S.scenario.from = this.value; persist(); renderAll(); });
-  $("toCcy").addEventListener("change", function () { S.scenario.to = this.value; persist(); renderAll(); });
-  $("swapBtn").addEventListener("click", function () { var f = S.scenario.from; S.scenario.from = S.scenario.to; S.scenario.to = f; persist(); renderAll(); });
-  $("holdAbroad").addEventListener("change", function () { S.scenario.holdAbroad = this.checked; persist(); renderAll(); });
-  $("presets").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-preset]"); if (!b) return;
-    var p = b.getAttribute("data-preset").split(",");
-    S.scenario.from = p[0]; S.scenario.to = p[1]; S.scenario.amount = +p[2];
-    persist(); renderAll();
-  });
-  $("routeList").addEventListener("click", function (e) {
-    var card = e.target.closest(".route"); if (!card) return;
-    state.selected = card.getAttribute("data-id");
-    renderAll();
-    if (e.target.closest("[data-sel]")) document.getElementById("breakdown").scrollIntoView();
-  });
-  $("codeSeg").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-code]"); if (!b) return;
-    S.fees.code = b.getAttribute("data-code"); persist(); renderAll();
-  });
-  $("cards").addEventListener("click", function (e) {
-    var c = e.target.closest("[data-pair]"); if (!c) return;
-    var p = c.getAttribute("data-pair").split("/");
-    S.scenario.from = p[0]; S.scenario.to = p[1]; persist(); renderAll();
-    document.getElementById("summary").scrollIntoView();
-  });
-  window.addEventListener("storage", function (e) {
-    if (e.key === FX.STORE_KEY) { S = FX.loadSettings(); renderAll(); }
-  });
-  document.addEventListener("visibilitychange", function () {
-    if (document.hidden) { clearTimeout(timer); state.nextAt = null; renderStatus(); }
-    else if (!state.paused) {
-      if (!state.lastCheck || Date.now() - state.lastCheck.getTime() >= REFRESH_MS) check(); else schedule();
-    }
-  });
-  setInterval(function () { if (state.lastCheck) renderStatus(); }, 1000);
-
-  fillSelects();
-  renderAll();
-  check();
-})();
-</script>
+<script src="fx-app.js"></script>
 </body>
 </html>

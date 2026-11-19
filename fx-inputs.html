@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rates and assumptions · FX Route Planner</title>
 <link rel="stylesheet" href="fx-theme.css">
+<script>try { var t = localStorage.getItem("fxapp.theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
 <style>
   .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px 14px; }
   .provs { display: grid; gap: 14px; }
@@ -43,11 +44,11 @@
     </div>
     <div class="controls">
       <span class="pill saved" id="savedPill" aria-live="polite">All changes saved</span>
-      <a class="btn primary" href="fx-board.html">← Back to the board</a>
+      <a class="btn primary" href="index.html#/compare">← Back to the dashboard</a>
     </div>
   </header>
 
-  <div class="banner show info">Illustrative only. Changes save automatically in this browser and update an open board straight away. Defaults marked "illustrative" are placeholders; replace them with real quotes.</div>
+  <div class="banner show info">Illustrative only. Changes save automatically in this browser and update an open dashboard straight away. Defaults marked "illustrative" are placeholders; replace them with real quotes.</div>
 
   <nav class="tabs" aria-label="Sections">
     <a href="#providers">Provider rates</a><a href="#fees">Fees and SWIFT</a><a href="#risk">Risk and timing</a>
@@ -131,7 +132,7 @@
 
   <!-- Methodology -->
   <section id="method" aria-labelledby="mTitle">
-    <h2 id="mTitle">Methodology <small>How the board works it out</small></h2>
+    <h2 id="mTitle">Methodology <small>How the dashboard works it out</small></h2>
     <div class="panel method">
       <details open><summary>Rate types</summary><p>A mid (central-bank reference or aggregator) is the fair market rate. A board rate, platform rate or dealer quote is what a customer actually gets. Only mids feed the consensus; customer rates never do.</p></details>
       <details><summary>Consensus mid</summary><pre>first = median(fresh mids)
@@ -201,8 +202,8 @@ P(edge lost) = Φ(−edge / band)</pre><p>Assumes normal daily moves and constan
   function midNote() {
     var i = mid.info("SGD", "THB");
     $("midNote").textContent = i.how === "fallback"
-      ? "No saved market rates yet, so checks below use the fallback rates. Open the board once while online to save live rates."
-      : "Checks below use market rates saved by the board at " + FX.hhmm(snap.at) + " " + FX.dayMon(snap.at) + (i.how === "stale" ? " (older than 2 business days)." : ".");
+      ? "No saved market rates yet, so checks below use the fallback rates. Open the dashboard once while online to save live rates."
+      : "Checks below use market rates saved by the dashboard at " + FX.hhmm(snap.at) + " " + FX.dayMon(snap.at) + (i.how === "stale" ? " (older than 2 business days)." : ".");
   }
 
   /* ---------- Providers ---------- */
